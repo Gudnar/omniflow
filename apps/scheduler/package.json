@@ -1,0 +1,24 @@
+{
+  "name": "@omniflow/scheduler",
+  "version": "0.1.0",
+  "description": "OmniFlow Scheduler - Cron jobs and scheduled tasks",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\" --fix"
+  },
+  "dependencies": {
+    "@omniflow/database": "workspace:*",
+    "@omniflow/utils": "workspace:*",
+    "node-cron": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/node-cron": "^3.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.3.0"
+  }
+}

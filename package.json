@@ -1,0 +1,22 @@
+{
+  "name": "omniflow",
+  "version": "0.1.0",
+  "description": "Multi-tenant SaaS platform for CRM, omnichannel conversations, AI agents, conversational ecommerce, and booking",
+  "private": true,
+  "packageManager": "pnpm@9.1.0",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:watch": "turbo run test:watch",
+    "db:migrate": "pnpm --filter database migrate dev",
+    "db:migrate:prod": "pnpm --filter database migrate deploy",
+    "db:generate": "pnpm --filter database generate",
+    "db:push": "pnpm --filter database db push"
+  },
+  "devDependencies": {
+    "turbo": "^2.0.0"
+  }
+}
