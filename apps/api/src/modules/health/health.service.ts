@@ -1,21 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import { HealthCheckResponse } from '@omniflow/types';
-import { PrismaService } from '../prisma/prisma.service';
+import { prisma } from '@omniflow/database';
 import { RedisService } from '../redis/redis.service';
 
 @Injectable()
 export class HealthService {
-  constructor(
-    private prismaService: PrismaService,
-    private redisService: RedisService,
-  ) {}
+  constructor(private redisService: RedisService) {}
 
   async check(): Promise<HealthCheckResponse> {
     let databaseCheck: 'ok' | 'error' = 'ok';
     let redisCheck: 'ok' | 'error' = 'ok';
 
     try {
-      await this.prismaService.$queryRaw`SELECT 1`;
+      await prisma.$queryRaw`SELECT 1`;
     } catch {
       databaseCheck = 'error';
     }

@@ -23,6 +23,10 @@ build/
 .next/
 .turbo/
 out/
+**/*.js
+**/*.d.ts
+**/*.d.ts.map
+**/*.js.map
 
 # Testing
 coverage/

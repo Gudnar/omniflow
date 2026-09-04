@@ -15,3 +15,6 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export const prisma = prismaInstance;
+
+export * from './tenant-scope';
+export type { Prisma } from './prisma';

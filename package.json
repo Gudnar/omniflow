@@ -14,7 +14,8 @@
     "db:migrate": "pnpm --filter database migrate dev",
     "db:migrate:prod": "pnpm --filter database migrate deploy",
     "db:generate": "pnpm --filter database generate",
-    "db:push": "pnpm --filter database db push"
+    "db:push": "pnpm --filter database db push",
+    "db:seed": "pnpm --filter database seed"
   },
   "devDependencies": {
     "turbo": "^2.0.0"
