@@ -45,7 +45,7 @@ export default function BranchesPage() {
         },
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await res.json() as Branch[];
         setBranches(data);
       }
     } catch (err) {

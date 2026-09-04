@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
+import { Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -32,30 +33,34 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex bg-white">
       {/* Left side - Branding (Blue Gradient) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-b from-blue-700 via-blue-700 to-blue-900 text-white p-12 flex-col justify-between relative overflow-hidden">
-        {/* Decorative wave at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 h-24" style={{
-          background: 'linear-gradient(135deg, #3b82f6 0%, #10b981 100%)',
-          clipPath: 'polygon(0 40%, 100% 20%, 100% 100%, 0% 100%)',
-          opacity: 0.3
-        }}></div>
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-b from-blue-700 via-blue-600 to-blue-900 text-white p-12 flex-col justify-between relative overflow-hidden">
+        {/* Decorative waves at bottom */}
+        <svg className="absolute bottom-0 left-0 right-0 w-full h-32" viewBox="0 0 1200 200" preserveAspectRatio="none" style={{ opacity: 0.15 }}>
+          <path d="M0,100 Q300,50 600,100 T1200,100 L1200,200 L0,200 Z" fill="#10b981" />
+        </svg>
+        <svg className="absolute bottom-8 left-0 right-0 w-full h-24" viewBox="0 0 1200 100" preserveAspectRatio="none" style={{ opacity: 0.2 }}>
+          <path d="M0,50 Q200,20 400,50 T800,50 T1200,50 L1200,100 L0,100 Z" fill="#06b6d4" />
+        </svg>
 
-        {/* Top Logo */}
+        {/* Top Logo and Title */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-16">
-            <div className="w-12 h-12 bg-white/25 rounded-lg flex items-center justify-center">
-              <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          <div className="flex items-center gap-3 mb-14">
+            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                <circle cx="9" cy="10" r="1" fill="currentColor" />
+                <circle cx="12" cy="10" r="1" fill="currentColor" />
+                <circle cx="15" cy="10" r="1" fill="currentColor" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold">OmniFlow</h1>
+            <h1 className="text-2xl font-bold tracking-tight">OmniFlow</h1>
           </div>
 
           {/* Main Heading */}
           <div className="mb-16">
-            <h2 className="text-4xl font-bold mb-6 leading-tight">
+            <h2 className="text-5xl font-bold mb-6 leading-tight">
               Conecta, gestiona y<br />
-              <span className="text-blue-200">haz crecer tu negocio</span>
+              <span className="text-cyan-200">haz crecer tu negocio</span>
             </h2>
             <p className="text-blue-100 text-base leading-relaxed max-w-md">
               OmniFlow unifica conversaciones, clientes, ventas y operaciones en una sola plataforma impulsada por IA.
@@ -63,12 +68,12 @@ export default function LoginPage() {
           </div>
 
           {/* Features List */}
-          <div className="space-y-5">
+          <div className="space-y-6">
             {/* Feature 1: Agents */}
             <div className="flex gap-4">
               <div className="w-14 h-14 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
                 </svg>
               </div>
               <div>
@@ -80,8 +85,8 @@ export default function LoginPage() {
             {/* Feature 2: Ecommerce */}
             <div className="flex gap-4">
               <div className="w-14 h-14 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" />
                 </svg>
               </div>
               <div>
@@ -93,8 +98,8 @@ export default function LoginPage() {
             {/* Feature 3: Reports */}
             <div className="flex gap-4">
               <div className="w-14 h-14 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7H5v12h12V9m0-2h6m0 0v6m0-6L9 17" />
+                <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z" />
                 </svg>
               </div>
               <div>
@@ -106,99 +111,101 @@ export default function LoginPage() {
         </div>
 
         {/* Bottom: User Avatars */}
-        <div className="flex items-center gap-2 relative z-10">
-          <div className="flex -space-x-3">
-            {['👩', '👨', '👩', '👨'].map((emoji, i) => (
+        <div className="flex items-center gap-3 relative z-10">
+          <div className="flex -space-x-2">
+            {[
+              { initials: 'MJ', color: 'bg-pink-500' },
+              { initials: 'JD', color: 'bg-blue-500' },
+              { initials: 'AR', color: 'bg-green-500' },
+              { initials: 'SL', color: 'bg-purple-500' },
+            ].map((avatar, i) => (
               <div
                 key={i}
-                className="w-10 h-10 bg-white/20 rounded-full border-2 border-blue-600 flex items-center justify-center text-sm"
+                className={`w-9 h-9 ${avatar.color} rounded-full border-2 border-blue-700 flex items-center justify-center text-xs font-bold text-white`}
               >
-                {emoji}
+                {avatar.initials}
               </div>
             ))}
           </div>
-          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-xs font-bold">
-            +4995
+          <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
+            +995
           </div>
           <p className="text-blue-100 text-xs ml-2">Más de 1.000 empresas ya confían en OmniFlow</p>
         </div>
       </div>
 
       {/* Right side - Login Form */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-16 py-12">
+      <div className="w-full lg:w-1/2 flex flex-col justify-center px-8 sm:px-12 py-12">
         <div className="max-w-md w-full">
           {/* Language selector */}
-          <div className="flex justify-end mb-12">
+          <div className="flex justify-end mb-16">
             <button className="flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm font-medium">
               <span>🌐</span> Español
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
-              </svg>
             </button>
           </div>
 
           {/* Header */}
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Bienvenido de nuevo</h2>
-            <p className="text-gray-500 text-sm">Inicia sesión para continuar en OmniFlow</p>
+          <div className="mb-10">
+            <h2 className="text-4xl font-bold text-gray-900 mb-3">Bienvenido de nuevo</h2>
+            <p className="text-gray-500 text-base">Inicia sesión para continuar en OmniFlow</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm font-medium">
                 {error}
               </div>
             )}
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">Correo electrónico</label>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Correo electrónico</label>
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => setEmail((e.target as HTMLInputElement).value)}
                 placeholder="ejemplo@empresa.com"
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
                 required
               />
             </div>
 
             {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">Contraseña</label>
+              <label className="block text-sm font-semibold text-gray-900 mb-2">Contraseña</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => setPassword((e.target as HTMLInputElement).value)}
                   placeholder="Tu contraseña"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900"
+                  className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 placeholder-gray-400"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  {showPassword ? '👁️' : '👁️‍🗨️'}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <a href="#" className="text-xs text-blue-600 hover:text-blue-700 mt-2 inline-block font-medium">
+              <button type="button" className="text-sm text-blue-600 hover:text-blue-700 mt-2 font-medium transition-colors">
                 ¿Olvidaste tu contraseña?
-              </a>
+              </button>
             </div>
 
             {/* Remember me checkbox */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <input
                 type="checkbox"
                 id="remember"
                 checked={rememberMe}
-                onChange={(e) => setRememberMe(e.target.checked)}
-                className="w-4 h-4 border border-gray-300 rounded bg-white checked:bg-blue-600 checked:border-blue-600 cursor-pointer"
+                onChange={(e) => setRememberMe((e.target as HTMLInputElement).checked)}
+                className="w-5 h-5 border border-gray-300 rounded cursor-pointer accent-blue-600"
               />
-              <label htmlFor="remember" className="text-sm text-gray-700 cursor-pointer">
+              <label htmlFor="remember" className="text-sm text-gray-700 cursor-pointer font-medium">
                 Recuérdame
               </label>
             </div>
@@ -207,20 +214,20 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg transition-colors text-sm"
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-3 rounded-lg transition-colors text-base mt-8"
             >
               {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
             </button>
           </form>
 
           {/* Divider */}
-          <div className="mt-8 mb-6">
+          <div className="mt-10 mb-6">
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-200"></div>
               </div>
               <div className="relative flex justify-center">
-                <span className="px-3 bg-white text-gray-500 text-xs font-medium">o continúa con</span>
+                <span className="px-3 bg-white text-gray-500 text-sm font-medium">o continúa con</span>
               </div>
             </div>
           </div>
@@ -228,16 +235,16 @@ export default function LoginPage() {
           {/* OAuth buttons */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { name: 'Google', symbol: 'G' },
-              { name: 'Microsoft', symbol: '⊟' },
-              { name: 'Apple', symbol: '🍎' },
+              { name: 'Google', icon: '🔍' },
+              { name: 'Microsoft', icon: '⊞' },
+              { name: 'Apple', icon: '🍎' },
             ].map((provider) => (
               <button
                 key={provider.name}
                 type="button"
-                className="py-3 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors flex flex-col items-center justify-center gap-1"
+                className="py-3 px-4 border border-gray-300 rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors flex flex-col items-center justify-center gap-2"
               >
-                <span className="text-lg">{provider.symbol}</span>
+                <span className="text-xl">{provider.icon}</span>
                 <span className="text-xs text-gray-700 font-medium">{provider.name}</span>
               </button>
             ))}
@@ -247,7 +254,7 @@ export default function LoginPage() {
           <div className="text-center mt-8">
             <p className="text-gray-600 text-sm">
               ¿No tienes una cuenta?{' '}
-              <Link href="/register" className="text-blue-600 hover:text-blue-700 font-semibold">
+              <Link href="/register" className="text-blue-600 hover:text-blue-700 font-semibold transition-colors">
                 Solicita una demostración
               </Link>
             </p>
