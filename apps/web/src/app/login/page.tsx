@@ -33,85 +33,146 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex bg-white">
       {/* Left side - Branding (Blue Gradient) */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-b from-blue-700 via-blue-600 to-blue-900 text-white p-12 flex-col justify-between relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-b from-blue-700 via-blue-600 to-blue-900 text-white p-8 flex-col justify-between relative overflow-hidden">
         {/* Decorative waves at bottom */}
-        <svg className="absolute bottom-0 left-0 right-0 w-full h-32" viewBox="0 0 1200 200" preserveAspectRatio="none" style={{ opacity: 0.15 }}>
+        <svg className="absolute bottom-0 left-0 right-0 w-full h-40" viewBox="0 0 1200 200" preserveAspectRatio="none" style={{ opacity: 0.2 }}>
           <path d="M0,100 Q300,50 600,100 T1200,100 L1200,200 L0,200 Z" fill="#10b981" />
         </svg>
-        <svg className="absolute bottom-8 left-0 right-0 w-full h-24" viewBox="0 0 1200 100" preserveAspectRatio="none" style={{ opacity: 0.2 }}>
+        <svg className="absolute bottom-12 left-0 right-0 w-full h-32" viewBox="0 0 1200 100" preserveAspectRatio="none" style={{ opacity: 0.15 }}>
           <path d="M0,50 Q200,20 400,50 T800,50 T1200,50 L1200,100 L0,100 Z" fill="#06b6d4" />
         </svg>
 
-        {/* Top Logo and Title */}
+        {/* Top Logo */}
         <div className="relative z-10">
-          <div className="flex items-center gap-3 mb-14">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-              <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div className="flex items-center gap-2 mb-8">
+            <div className="w-10 h-10 bg-white/25 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                 <circle cx="9" cy="10" r="1" fill="currentColor" />
                 <circle cx="12" cy="10" r="1" fill="currentColor" />
                 <circle cx="15" cy="10" r="1" fill="currentColor" />
               </svg>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">OmniFlow</h1>
+            <h1 className="text-2xl font-bold">OmniFlow</h1>
           </div>
 
           {/* Main Heading */}
-          <div className="mb-16">
-            <h2 className="text-5xl font-bold mb-6 leading-tight">
-              Conecta, gestiona y<br />
-              <span className="text-cyan-200">haz crecer tu negocio</span>
-            </h2>
-            <p className="text-blue-100 text-base leading-relaxed max-w-md">
-              OmniFlow unifica conversaciones, clientes, ventas y operaciones en una sola plataforma impulsada por IA.
-            </p>
-          </div>
+          <h2 className="text-4xl font-bold mb-4 leading-tight">
+            Conecta, gestiona y<br />
+            <span className="text-blue-200">haz crecer tu negocio</span>
+          </h2>
+          <p className="text-blue-100 text-sm mb-12 max-w-sm">
+            OmniFlow unifica conversaciones, clientes, ventas y operaciones en una sola plataforma impulsada por IA.
+          </p>
+        </div>
 
-          {/* Features List */}
-          <div className="space-y-6">
-            {/* Feature 1: Agents */}
-            <div className="flex gap-4">
-              <div className="w-14 h-14 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z" />
-                </svg>
+        {/* Dashboard Mockup */}
+        <div className="relative z-10 mx-auto mb-8 w-full max-w-xs">
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl overflow-hidden border border-white/20 shadow-2xl">
+            {/* Dashboard header */}
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-4 py-3 flex items-center gap-2">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-white/40 rounded-full"></div>
+                <div className="w-2 h-2 bg-white/60 rounded-full"></div>
+                <div className="w-2 h-2 bg-white/80 rounded-full"></div>
               </div>
-              <div>
-                <h3 className="font-bold text-base mb-1">Agentes IA</h3>
-                <p className="text-blue-100 text-sm">Atiende, vende y brinda soporte 24/7 por WhatsApp y otros canales.</p>
-              </div>
+              <span className="text-white text-xs font-semibold ml-auto">Dashboard</span>
             </div>
 
-            {/* Feature 2: Ecommerce */}
-            <div className="flex gap-4">
-              <div className="w-14 h-14 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z" />
-                </svg>
+            {/* Dashboard content */}
+            <div className="p-3 space-y-3">
+              {/* Stat card */}
+              <div className="bg-white/95 rounded-lg p-3">
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-gray-600 text-xs font-medium">Ventas hoy</span>
+                  <span className="text-green-600 text-xs font-bold">↑ 12.5%</span>
+                </div>
+                <div className="text-xl font-bold text-gray-900">Bs. 24,650</div>
               </div>
-              <div>
-                <h3 className="font-bold text-base mb-1">Ecommerce conversacional</h3>
-                <p className="text-blue-100 text-sm">Catálogo, carrito y pagos dentro de la conversación.</p>
-              </div>
-            </div>
 
-            {/* Feature 3: Reports */}
-            <div className="flex gap-4">
-              <div className="w-14 h-14 bg-blue-500 rounded-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-7 h-7 text-white" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zm5.6 8H19v6h-2.8z" />
-                </svg>
+              {/* Stats row */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-white/90 rounded-lg p-2">
+                  <div className="text-xs text-gray-600 mb-1">Conversaciones</div>
+                  <div className="text-lg font-bold text-gray-900">128</div>
+                </div>
+                <div className="bg-white/90 rounded-lg p-2">
+                  <div className="text-xs text-gray-600 mb-1">Tasa cierre</div>
+                  <div className="text-lg font-bold text-green-600">↑ 12.8%</div>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-base mb-1">Reportes en tiempo real</h3>
-                <p className="text-blue-100 text-sm">Toma decisiones con dashboards e indicadores clave.</p>
+
+              {/* Mini chart */}
+              <div className="bg-white/90 rounded-lg p-2">
+                <div className="text-xs text-gray-600 mb-2">Ventas últimos 7 días</div>
+                <div className="h-12 bg-gradient-to-r from-blue-100 to-blue-200 rounded flex items-end justify-around px-1 py-2">
+                  <div className="w-1 h-4 bg-blue-500 rounded-t"></div>
+                  <div className="w-1 h-6 bg-blue-600 rounded-t"></div>
+                  <div className="w-1 h-5 bg-blue-500 rounded-t"></div>
+                  <div className="w-1 h-8 bg-blue-600 rounded-t"></div>
+                  <div className="w-1 h-7 bg-blue-500 rounded-t"></div>
+                  <div className="w-1 h-9 bg-blue-600 rounded-t"></div>
+                  <div className="w-1 h-6 bg-blue-500 rounded-t"></div>
+                </div>
+              </div>
+
+              {/* Channel list */}
+              <div className="bg-white/90 rounded-lg p-2">
+                <div className="text-xs text-gray-600 font-medium mb-2">Canales principales</div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">WhatsApp</span>
+                    <span className="font-bold text-gray-900">108</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">Instagram</span>
+                    <span className="font-bold text-gray-900">64</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-700">Facebook</span>
+                    <span className="font-bold text-gray-900">32</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
 
+        {/* Features List */}
+        <div className="relative z-10 space-y-3 mb-8">
+          <div className="flex gap-3">
+            <div className="w-10 h-10 bg-blue-500 rounded flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-lg">🤖</span>
+            </div>
+            <div>
+              <h3 className="font-bold text-sm">Agentes IA</h3>
+              <p className="text-blue-100 text-xs">Atiende, vende y brinda soporte 24/7</p>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <div className="w-10 h-10 bg-blue-500 rounded flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-lg">🛒</span>
+            </div>
+            <div>
+              <h3 className="font-bold text-sm">Ecommerce conversacional</h3>
+              <p className="text-blue-100 text-xs">Catálogo y pagos en la conversación</p>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <div className="w-10 h-10 bg-blue-500 rounded flex items-center justify-center flex-shrink-0">
+              <span className="text-white text-lg">📊</span>
+            </div>
+            <div>
+              <h3 className="font-bold text-sm">Reportes en tiempo real</h3>
+              <p className="text-blue-100 text-xs">Dashboards e indicadores clave</p>
+            </div>
+          </div>
+        </div>
+
         {/* Bottom: User Avatars */}
-        <div className="flex items-center gap-3 relative z-10">
+        <div className="flex items-center gap-2 relative z-10">
           <div className="flex -space-x-2">
             {[
               { initials: 'MJ', color: 'bg-pink-500' },
@@ -121,16 +182,16 @@ export default function LoginPage() {
             ].map((avatar, i) => (
               <div
                 key={i}
-                className={`w-9 h-9 ${avatar.color} rounded-full border-2 border-blue-700 flex items-center justify-center text-xs font-bold text-white`}
+                className={`w-8 h-8 ${avatar.color} rounded-full border-2 border-blue-700 flex items-center justify-center text-xs font-bold text-white`}
               >
                 {avatar.initials}
               </div>
             ))}
           </div>
-          <div className="w-9 h-9 bg-blue-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
+          <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-xs font-bold text-white">
             +995
           </div>
-          <p className="text-blue-100 text-xs ml-2">Más de 1.000 empresas ya confían en OmniFlow</p>
+          <p className="text-blue-100 text-xs">Más de 1.000 empresas confían en OmniFlow</p>
         </div>
       </div>
 
