@@ -2,7 +2,9 @@ import { Worker, Queue } from 'bullmq';
 import Redis from 'ioredis';
 import { logger } from '@omniflow/utils';
 
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+  maxRetriesPerRequest: null,
+});
 
 const exampleQueue = new Queue('example', { connection: redis });
 
@@ -14,7 +16,9 @@ const worker = new Worker(
     logger.info('Job completed', { jobId: job.id });
     return { success: true };
   },
-  { connection: redis, concurrency: 5 },
+  { connection: new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
+    maxRetriesPerRequest: null,
+  }), concurrency: 5 },
 );
 
 worker.on('completed', (job) => {
