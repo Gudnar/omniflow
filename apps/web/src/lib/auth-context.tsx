@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { AuthResponse, AuthTokens } from '@omniflow/types';
+import { TOKENS_REFRESHED_EVENT, TOKENS_EXPIRED_EVENT } from './api-client';
 
 interface AuthContextType {
   user: { id: string; email: string; tenantId: string; mfaEnabled: boolean } | null;
@@ -30,6 +31,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     setIsLoading(false);
+  }, []);
+
+  // api-client.ts refreshes the access token itself behind a 401 (it has no
+  // access to this component's state), then broadcasts the result here so
+  // every screen reading `tokens`/`user` from useAuth() picks up the new
+  // token instead of continuing to send the expired one.
+  useEffect(() => {
+    const onRefreshed = (e: Event) => {
+      const next = (e as CustomEvent<AuthTokens>).detail;
+      setTokens(next);
+      localStorage.setItem('auth_tokens', JSON.stringify(next));
+    };
+    const onExpired = () => logout();
+
+    window.addEventListener(TOKENS_REFRESHED_EVENT, onRefreshed);
+    window.addEventListener(TOKENS_EXPIRED_EVENT, onExpired);
+    return () => {
+      window.removeEventListener(TOKENS_REFRESHED_EVENT, onRefreshed);
+      window.removeEventListener(TOKENS_EXPIRED_EVENT, onExpired);
+    };
   }, []);
 
   const login = async (email: string, password: string) => {

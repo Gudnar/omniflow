@@ -13,10 +13,13 @@
   "dependencies": {
     "@omniflow/types": "workspace:*",
     "@omniflow/ui": "workspace:*",
+    "@xyflow/react": "^12.3.0",
     "lucide-react": "^1.40.0",
     "next": "^14.0.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "recharts": "^3.10.1",
+    "socket.io-client": "^4.7.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

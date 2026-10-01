@@ -1,10 +1,20 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
-import { MessageCircle, LayoutDashboard, Building2, LogOut, Menu, X } from 'lucide-react';
+import { Sidebar } from '@/components/dashboard/sidebar';
+import { Header } from '@/components/dashboard/header';
+import { X } from 'lucide-react';
+
+const TITLES: Record<string, string> = {
+  '/dashboard': 'Inicio',
+  '/dashboard/branches': 'Sucursales',
+  '/dashboard/conversations': 'Conversaciones',
+  '/dashboard/contacts': 'Contactos',
+  '/dashboard/crm': 'CRM',
+  '/dashboard/settings': 'Configuración',
+};
 
 export default function DashboardLayout({
   children,
@@ -12,8 +22,9 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const { user, isLoading, logout } = useAuth();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const pathname = usePathname();
+  const { user, isLoading } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -32,91 +43,35 @@ export default function DashboardLayout({
     );
   }
 
+  const title = TITLES[pathname] || 'Inicio';
+
   return (
-    <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
-      <div
-        className={`${
-          sidebarOpen ? 'w-64' : 'w-20'
-        } bg-gradient-to-b from-blue-900 to-blue-800 text-white transition-all duration-300 flex flex-col border-r border-blue-700`}
-      >
-        {/* Logo */}
-        <div className="p-6 border-b border-blue-700 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
-              <MessageCircle className="w-6 h-6" />
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      <Sidebar />
+
+      {/* Mobile sidebar drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={() => setMobileOpen(false)}
+          />
+          <div className="absolute inset-y-0 left-0 flex">
+            <div className="relative">
+              <Sidebar className="flex" />
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="absolute top-4 -right-10 p-2 rounded-lg bg-white/10 text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            {sidebarOpen && <h1 className="text-xl font-bold">OmniFlow</h1>}
           </div>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1 hover:bg-blue-700 rounded-lg transition"
-          >
-            {sidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </button>
         </div>
+      )}
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-2">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition"
-          >
-            <LayoutDashboard className="w-5 h-5" />
-            {sidebarOpen && <span>Dashboard</span>}
-          </Link>
-          <Link
-            href="/dashboard/branches"
-            className="flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-blue-700 transition"
-          >
-            <Building2 className="w-5 h-5" />
-            {sidebarOpen && <span>Sucursales</span>}
-          </Link>
-        </nav>
-
-        {/* User & Logout */}
-        <div className="p-4 border-t border-blue-700 space-y-2">
-          <div className="px-4 py-2 rounded-lg bg-blue-700/50">
-            {sidebarOpen && (
-              <div className="text-sm">
-                <p className="font-semibold truncate">{user?.email}</p>
-                <p className="text-blue-200 text-xs">Administrador</p>
-              </div>
-            )}
-          </div>
-          <button
-            onClick={() => {
-              logout();
-              router.push('/login');
-            }}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-red-600 transition text-red-200 hover:text-white"
-          >
-            <LogOut className="w-5 h-5" />
-            {sidebarOpen && <span>Cerrar sesión</span>}
-          </button>
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-8 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-900">OmniFlow</h2>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">{user?.email}</span>
-            <button
-              onClick={() => {
-                logout();
-                router.push('/login');
-              }}
-              className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition font-medium"
-            >
-              Salir
-            </button>
-          </div>
-        </header>
-
-        {/* Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <Header title={title} onMenuClick={() => setMobileOpen(true)} />
         <main className="flex-1 overflow-auto">{children}</main>
       </div>
     </div>

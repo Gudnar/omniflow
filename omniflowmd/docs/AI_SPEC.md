@@ -20,3 +20,6 @@ Cada tool define required_permissions, allowed_scopes, input_schema, risk_level,
 
 ## Context/RAG
 Resumen + mensajes relevantes + memoria + RAG. RAG estrictamente aislado por tenant.
+
+## Voice futuro
+Transcripción: notas de voz de WhatsApp/Instagram/Messenger se transcriben (Whisper u otro STT) y el texto resultante se usa como mensaje de entrada del agente — sin cambio en el flujo de tools/RAG existente (ver IMPLEMENTATION_PLAN.md "Voice: Audio transcription"). Llamadas telefónicas: requiere proveedor de telefonía (Twilio Voice u otra plataforma voice-agent) y un pipeline en tiempo real (STT→LLM→TTS) fuera del ciclo request/response HTTP habitual, más un modelo de datos nuevo para Call/grabación/transcripción (ver IMPLEMENTATION_PLAN.md "Voice: Phone calls futuro"). No implementar sin elegir proveedor.

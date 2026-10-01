@@ -37,6 +37,38 @@ model Tenant {
   name String
   slug String @unique
   status TenantStatus @default(ACTIVE)
+
+  taxId String?
+  description String?
+  logo String?
+  timezone String @default("America/La_Paz")
+  language String @default("es")
+  currency String @default("BOB")
+  dateFormat String @default("DD/MM/YYYY")
+  timeFormat String @default("24h")
+  decimalSeparator String @default(",")
+  thousandsSeparator String @default(".")
+
+  // 'AUTOMATIC' (default, today's only behavior — CartsService.checkout()
+  // confirms every order immediately) | 'MANUAL' (order is created PENDING;
+  // an operator must explicitly approve/reject it via the already-existing
+  // OrdersService.confirm()/cancel()).
+  orderApprovalMode String @default("AUTOMATIC")
+
+  // Same idea as orderApprovalMode but for AppointmentsService.create() —
+  // 'AUTOMATIC' (default, today's only behavior — every appointment is
+  // created CONFIRMED) | 'MANUAL' (appointment is created PENDING; an
+  // operator must explicitly approve/reject it via the already-existing
+  // AppointmentsService.setStatus()/cancel()).
+  appointmentApprovalMode String @default("AUTOMATIC")
+
+  // Built-in notification toggles for the two "requires manual approval"
+  // moments CartsService.checkout()/AppointmentsService.create() already
+  // create — separate from the generic NOTIFY workflow action below, which
+  // covers arbitrary operator-defined automations.
+  notifyOnOrderPendingApproval Boolean @default(true)
+  notifyOnAppointmentPendingApproval Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -45,6 +77,72 @@ model Tenant {
   refreshTokens RefreshToken[]
   branches Branch[]
   userBranches UserBranch[]
+  contacts Contact[]
+  companies Company[]
+  tags Tag[]
+  contactTags ContactTag[]
+  notes Note[]
+  activities Activity[]
+  contactChannels ContactChannel[]
+  conversations Conversation[]
+  messages Message[]
+  attachments Attachment[]
+  metaConnections MetaConnection[]
+  tikTokConnection TikTokConnection?
+  ecommerceStore EcommerceStore?
+  ecommerceStoreSettings EcommerceStoreSettings[]
+  ecommerceSections EcommerceSection[]
+  ecommerceStoreBranches EcommerceStoreBranch[]
+  categories Category[]
+  products Product[]
+  productVariants ProductVariant[]
+  productMedia ProductMedia[]
+  branchProducts BranchProduct[]
+  inventoryMovements InventoryMovement[]
+  inventoryTransfers InventoryTransfer[]
+  inventoryTransferItems InventoryTransferItem[]
+  customerAddresses CustomerAddress[]
+  commerceSessions CommerceSession[]
+  carts Cart[]
+  cartItems CartItem[]
+  orders Order[]
+  orderItems OrderItem[]
+  orderStatusHistory OrderStatusHistory[]
+  bookingServices BookingService[]
+  bookingServiceUsers BookingServiceUser[]
+  bookingResources BookingResource[]
+  bookingResourceServices BookingResourceService[]
+  bookingResourceSchedules BookingResourceSchedule[]
+  userSchedules UserSchedule[]
+  userScheduleIntervals UserScheduleInterval[]
+  userTimeOffs UserTimeOff[]
+  bookingBlackoutDates BookingBlackoutDate[]
+  appointments Appointment[]
+  appointmentServices AppointmentService[]
+  appointmentResources AppointmentResource[]
+  appointmentStatusHistory AppointmentStatusHistory[]
+  paymentMethods PaymentMethod[]
+  notifications Notification[]
+  events Event[]
+  flows Flow[]
+  flowNodes FlowNode[]
+  flowEdges FlowEdge[]
+  flowExecutions FlowExecution[]
+  flowExecutionLogs FlowExecutionLog[]
+  messageTemplates MessageTemplate[]
+  segments Segment[]
+  campaigns Campaign[]
+  campaignRecipients CampaignRecipient[]
+  fulfillments Fulfillment[]
+  aiAgents AiAgent[]
+  aiUsage AiUsage[]
+  knowledgeDocuments KnowledgeDocument[]
+  knowledgeChunks KnowledgeChunk[]
+  aiAgentKnowledgeDocuments AiAgentKnowledgeDocument[]
+  posts Post[]
+  comments Comment[]
+  linkPage LinkPage?
+  linkPageItems LinkPageItem[]
 
   @@index([status])
 }
@@ -177,12 +275,35 @@ model Branch {
   slug String
   status BranchStatus @default(ACTIVE)
   address String?
+  // Optional — only set when an admin configures them. Lets the storefront
+  // route a customer to the nearest branch by browser geolocation
+  // (StorefrontService/CommerceSessionsService.setNearestBranch); a store
+  // with fewer than 2 branches carrying both fields never triggers that
+  // flow (SECURITY.md: only request location when actually configured/used).
+  latitude Float?
+  longitude Float?
   timezone String @default("UTC")
+  // Minimum advance notice, in days, required for a PUBLIC booking-storefront
+  // reservation (see BookingStorefrontService) — not enforced for
+  // operator-created appointments, who may still book same-day walk-ins.
+  minBookingLeadDays Int @default(1)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   users UserBranch[]
+  conversations Conversation[]
+  ecommerceStores EcommerceStoreBranch[]
+  branchProducts BranchProduct[]
+  outgoingTransfers InventoryTransfer[] @relation("TransferFromBranch")
+  incomingTransfers InventoryTransfer[] @relation("TransferToBranch")
+  commerceSessions CommerceSession[]
+  carts Cart[]
+  orders Order[]
+  bookingResources BookingResource[]
+  appointments Appointment[]
+  fulfillments Fulfillment[]
+  bookingBlackoutDates BookingBlackoutDate[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -203,4 +324,2145 @@ model UserBranch {
   @@id([userId, branchId])
   @@index([branchId])
   @@index([tenantId])
+}
+
+// Phase 4: CRM
+
+enum ContactType {
+  LEAD
+  PROSPECT
+  CUSTOMER
+}
+
+enum ContactStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ContactSource {
+  WHATSAPP
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  MESSENGER
+  WEBSITE
+  REFERRAL
+  MANUAL
+  OTHER
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  WHATSAPP
+  TASK
+  OTHER
+}
+
+model Company {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name String
+  industry String?
+  website String?
+  phone String?
+  email String?
+  address String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts Contact[]
+
+  @@index([tenantId])
+}
+
+model Contact {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name String
+  email String?
+  phone String?
+  type ContactType @default(LEAD)
+  status ContactStatus @default(ACTIVE)
+  source ContactSource?
+
+  companyId String?
+  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  // Plain scalar, not a formal relation to User (avoids touching the User model;
+  // no DB-level FK integrity on owner assignment in this phase).
+  ownerId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tags ContactTag[]
+  notes Note[]
+  activities Activity[]
+  channels ContactChannel[]
+  conversations Conversation[]
+  addresses CustomerAddress[]
+  commerceSessions CommerceSession[]
+  carts Cart[]
+  orders Order[]
+  appointments Appointment[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@index([companyId])
+}
+
+model Tag {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name String
+  color String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contacts ContactTag[]
+
+  @@unique([tenantId, name])
+}
+
+model ContactTag {
+  contactId String
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  tagId String
+  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([contactId, tagId])
+  @@index([tagId])
+  @@index([tenantId])
+}
+
+model Note {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  // Plain scalar, not a formal relation to User (same rationale as Contact.ownerId).
+  authorId String
+  body String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([contactId])
+}
+
+model Activity {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  ownerId String?
+  type ActivityType
+  subject String
+  description String?
+  occurredAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([contactId, occurredAt])
+}
+
+// Phase 5: Conversations
+
+enum Channel {
+  WHATSAPP
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  MESSENGER
+  WEBCHAT
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  CLOSED
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  NOTE
+  SYSTEM
+  // Phase 17: Campaigns/templates — an outbound message built from an
+  // approved WhatsApp MessageTemplate (see Message.templatePayload below).
+  TEMPLATE
+  // Phase 26: Voice/audio transcription — an INBOUND voice note. Created
+  // with content: '' and an Attachment (the stored audio file); once
+  // AiTranscriptionService transcribes it, content is overwritten with the
+  // transcript text, same row (no separate "transcript" model).
+  AUDIO
+  // Phase 14 (partial): an OUTBOUND, agent-initiated interactive message —
+  // the AI agent's send_storefront_link tool decided the customer showed
+  // buying/booking intent and generated a real link (see
+  // Message.ctaPayload). Never client-authored: AiReplyService is the only
+  // writer with a non-empty ctaPayload.
+  CTA
+}
+
+model ContactChannel {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  channel Channel
+  externalId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  conversations Conversation[]
+
+  @@unique([contactId, channel])
+  @@index([tenantId])
+  @@index([tenantId, channel, externalId])
+}
+
+model Conversation {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  contactChannelId String?
+  contactChannel ContactChannel? @relation(fields: [contactChannelId], references: [id], onDelete: SetNull)
+
+  channel Channel
+  status ConversationStatus @default(OPEN)
+
+  branchId String?
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  // Plain scalar, not a formal relation to User (same rationale as Contact.ownerId).
+  assignedToId String?
+
+  // An opaque token (same shape as CommerceSession.publicToken) granting
+  // public web access to THIS specific conversation, both to POST messages
+  // and to join its Socket.IO room. Set for two distinct cases, both
+  // resolved by RealtimeGateway/ConversationWindowService the exact same
+  // way regardless of channel: (a) a Página de Enlaces WEBCHAT conversation
+  // minted from scratch (WebchatService.start()), or (b) an existing
+  // conversation on ANY channel (e.g. WhatsApp) whose customer was handed a
+  // "continue this conversation from the web" link
+  // (ConversationsService.generateWebLink()). No expiry: this only gates a
+  // chat history, not payments, so a longer-lived "keep talking to the same
+  // conversation" UX matters more than a short window.
+  webchatToken String? @unique
+
+  // True when the MOST RECENT inbound message on this conversation came
+  // from the /chat/[token] web window rather than the real external
+  // channel — MessagesService.create() reads this to skip re-dispatching
+  // the next outbound reply (agent or operator) to the real channel while
+  // the customer is active in the web window. Any real inbound message
+  // (webhook-originated) always resets this back to false, restoring
+  // normal external delivery.
+  lastInboundViaWebWindow Boolean @default(false)
+
+  lastMessageAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages Message[]
+  commerceSessions CommerceSession[]
+  carts Cart[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, lastMessageAt])
+  @@index([contactId])
+  @@index([branchId])
+}
+
+model Message {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  conversationId String
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  direction MessageDirection
+  type MessageType @default(TEXT)
+  content String
+
+  // Meta's message id (messages[].id from the WhatsApp webhook payload).
+  // Nullable because manually-created messages via POST /conversations/:id/messages
+  // have no external id. Unique so a replayed webhook delivery attempting to
+  // re-insert the same Meta message fails the constraint rather than duplicating.
+  externalId String? @unique
+
+  // Plain scalar, not a formal relation to User (same rationale as Contact.ownerId).
+  // Null for INBOUND (customer) messages; set to the agent's userId for OUTBOUND/NOTE.
+  senderId String?
+
+  // Phase 17: Campaigns/templates. Plain scalar (same rationale as senderId
+  // above) tracing a TEMPLATE message back to the campaign that sent it.
+  campaignId String?
+  // Snapshot of the exact Graph API `template` object ({name, language,
+  // components}) resolved at send time — set only when type is TEMPLATE, so
+  // apps/worker's outbound processor never has to re-resolve variables
+  // (same snapshot rationale as OrderItem/AppointmentService).
+  templatePayload Json?
+
+  // Set only when type is CTA: { action: 'STORE' | 'BOOKING', url: string }.
+  // `url` is the already-generated, real ContactCommerceService link — never
+  // a raw string the LLM wrote itself (same snapshot rationale as
+  // templatePayload above).
+  ctaPayload Json?
+
+  createdAt DateTime @default(now())
+
+  attachments Attachment[]
+
+  @@index([tenantId])
+  @@index([conversationId, createdAt])
+}
+
+model Attachment {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  messageId String
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  url String
+  mimeType String
+  fileName String
+  size Int
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([messageId])
+}
+
+// Phase 6: WhatsApp (generalized in Phase 7 to cover Instagram/Messenger too)
+
+enum MetaConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+}
+
+model MetaConnection {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Only WHATSAPP, INSTAGRAM, MESSENGER, or FACEBOOK are ever written here
+  // (enforced in application code, not at the DB level). FACEBOOK is a
+  // separate row from MESSENGER even though both connect the same Page —
+  // Phase 27: Facebook Page comments uses a distinct Channel value so a
+  // tenant can connect/disconnect comment-replying independently of
+  // Messenger DMs, even though the underlying Page access token is the same.
+  channel Channel
+
+  // Meta's own external identifier for this connection:
+  //   WHATSAPP  -> phone_number_id
+  //   INSTAGRAM -> instagram_business_account_id
+  //   MESSENGER -> page id
+  //   FACEBOOK  -> page id (same Page as MESSENGER, connected separately)
+  // Each is globally unique WITHIN its own product namespace, but nothing
+  // guarantees cross-product uniqueness of the raw string, so uniqueness is
+  // scoped by channel below, not global.
+  externalAccountId String
+
+  // Only meaningful for WHATSAPP (the WABA container id). Null for
+  // INSTAGRAM/MESSENGER connections.
+  wabaId String?
+
+  // Stored in plaintext, consistent with existing precedent: User.mfaSecret
+  // is also stored unencrypted in this codebase. Encryption-at-rest for
+  // per-tenant secrets is an explicit out-of-scope follow-up. For
+  // INSTAGRAM/MESSENGER this is the linked Facebook Page's access token
+  // (Instagram messaging is sent via the Page token, not a separate IG token).
+  accessToken String
+
+  // WhatsApp's displayPhoneNumber, Instagram's username, or the Page's name.
+  displayName String
+
+  status MetaConnectionStatus @default(CONNECTED)
+  connectedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, channel])
+  @@unique([channel, externalAccountId])
+  @@index([status])
+}
+
+// Phase 27: Facebook Page comments. Deliberately NOT modeled as
+// Conversation/Message — a comment thread under a public post has no single
+// "contact" (many distinct commenters can reply to the same post, and to
+// each other), unlike Conversation's 1:1-with-a-Contact design. Post is the
+// anchor entity; Comment supports one level of nesting via parentId (Meta's
+// own comment API is effectively flat/one-level in practice).
+model Post {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  externalId String // Meta's post_id
+  // Best-effort, fetched once via Graph API when the post is first seen
+  // (i.e. when its first comment arrives) — never re-fetched/refreshed.
+  message String?
+  permalink String?
+
+  comments Comment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId])
+}
+
+model Comment {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  postId String
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  // Meta's comment_id. Null for an OUTBOUND row between the moment we create
+  // it (so the operator sees it immediately) and the worker's send job
+  // actually confirming it with Graph API — same "snapshot now, backfill
+  // after send" shape as nothing else in this codebase needs, since Message
+  // rows are only ever created after a successful (or queued-for-retry) send.
+  externalId String? @unique
+
+  parentId String?
+  parent Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies Comment[] @relation("CommentReplies")
+
+  direction MessageDirection // reuses the same INBOUND/OUTBOUND enum as Message
+  authorExternalId String? // null for OUTBOUND (it's us, the Page)
+  authorName String? // null for OUTBOUND
+  message String
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, postId])
+}
+
+// Phase 7: TikTok
+
+enum TikTokConnectionStatus {
+  CONNECTED
+  DISCONNECTED
+}
+
+model TikTokConnection {
+  id String @id @default(cuid())
+
+  tenantId String @unique
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // TikTok's business/advertiser account id from the OAuth exchange. Named
+  // businessId rather than openId (TikTok's consumer Login-Kit concept, a
+  // different product) — verify the exact field name against a real OAuth
+  // response once the user has TikTok developer access.
+  businessId String @unique
+
+  clientKey String
+  accessToken String
+  // TikTok OAuth tokens expire and require a refresh_token grant. Stored
+  // here, but actual refresh-on-expiry logic is an explicit out-of-scope gap
+  // for this phase — Meta's long-lived tokens don't need this, TikTok's do.
+  refreshToken String
+
+  status TikTokConnectionStatus @default(CONNECTED)
+  connectedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+// Phase 8: Ecommerce foundation (store config only — no Product/Cart/Order
+// yet, those are Phases 9-11). Scope intentionally narrow: colors/font live
+// directly on EcommerceStoreSettings (no separate Theme model), and
+// navigation/social/SEO/checkout settings are deferred (undocumented and/or
+// belong to future phases).
+
+enum EcommerceStoreStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum EcommerceOperationMode {
+  DIRECT_SALE
+  BOOKING
+  BOTH
+}
+
+enum EcommerceLocationSource {
+  WHATSAPP
+  STOREFRONT
+  BOTH
+  NONE
+}
+
+enum FulfillmentType {
+  PICKUP
+  LOCAL_DELIVERY
+  SHIPPING
+}
+
+enum EcommerceSectionType {
+  BANNER
+  TEXT_BLOCK
+  IMAGE_GALLERY
+}
+
+model EcommerceStore {
+  id String @id @default(cuid())
+
+  tenantId String @unique
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name String
+  // Globally unique — backs the public storefront route (/tienda/:slug).
+  // Previously had no uniqueness constraint at all (admin-only usage never
+  // needed it); safe to add now (tenantId is itself @unique, so today's
+  // dev data can only ever have one row).
+  slug String @unique
+  status EcommerceStoreStatus @default(DRAFT)
+  operationMode EcommerceOperationMode @default(DIRECT_SALE)
+  locationSource EcommerceLocationSource @default(WHATSAPP)
+  fulfillmentOptions FulfillmentType[] @default([PICKUP])
+  publishedAt DateTime?
+  // Opt-in AI shopping assistant widget on the public storefront — same
+  // WEBCHAT channel/Socket.IO infra as the Página de Enlaces widget (see
+  // LinkPage.chatEnabled), just a separate toggle since a tenant may want it
+  // on one surface and not the other.
+  chatEnabled Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  settings EcommerceStoreSettings?
+  sections EcommerceSection[]
+  branches EcommerceStoreBranch[]
+}
+
+model EcommerceStoreSettings {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  storeId String @unique
+  store EcommerceStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  logo String?
+  mobileLogo String?
+  favicon String?
+  heroImage String?
+  mobileHeroImage String?
+  primaryColor String @default("#2563eb")
+  secondaryColor String @default("#1e293b")
+  buttonColor String @default("#2563eb")
+  textColor String @default("#111827")
+  backgroundColor String @default("#ffffff")
+  promoColor String @default("#dc2626")
+  fontFamily String @default("Inter")
+
+  updatedAt DateTime @updatedAt
+}
+
+model EcommerceSection {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  storeId String
+  store EcommerceStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  type EcommerceSectionType
+  title String?
+  subtitle String?
+  config Json @default("{}")
+  sortOrder Int
+  enabled Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId, sortOrder])
+}
+
+// Pure join table (composite PK) — same caveat as ContactTag
+// (packages/database/src/tenant-scope.ts): use create/findFirst/findMany/
+// deleteMany, never findUnique/delete with the composite key.
+model EcommerceStoreBranch {
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  storeId String
+  store EcommerceStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@id([storeId, branchId])
+}
+
+// Standalone public "link in bio" page (Linktree-style) — deliberately not
+// tied to EcommerceStore: a tenant may want a bio-link page without a store,
+// and its slug is independent (public route /enlaces/:slug, not /tienda).
+enum LinkPageStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model LinkPage {
+  id String @id @default(cuid())
+
+  tenantId String @unique
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  slug String @unique
+  title String
+  bio String?
+  avatarUrl String?
+  status LinkPageStatus @default(DRAFT)
+  primaryColor String @default("#2563eb")
+  backgroundColor String @default("#ffffff")
+  textColor String @default("#111827")
+  // Opt-in: a tenant may not want the chat widget floating on their bio page
+  // even if they'd otherwise use the AI agent on other channels.
+  chatEnabled Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items LinkPageItem[]
+}
+
+model LinkPageItem {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  linkPageId String
+  linkPage LinkPage @relation(fields: [linkPageId], references: [id], onDelete: Cascade)
+
+  label String
+  url String
+  // Cosmetic key rendered client-side (whatsapp|instagram|facebook|tiktok|link) —
+  // never validated against MetaConnection; the operator pastes whatever URL they want.
+  icon String?
+  sortOrder Int
+  enabled Boolean @default(true)
+  clickCount Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([linkPageId, sortOrder])
+}
+
+// Phase 9: Products + Inventory. Every product has >=1 variant, even a
+// "simple" product with no real options gets one implicit default variant —
+// this keeps price/stock keyed uniformly to (branchId, variantId) instead of
+// needing a nullable variantId on BranchProduct. Categories are a single
+// self-referential tree (parentId) rather than separate categories/
+// subcategories tables. Stock is never directly PATCHable — it only changes
+// via an adjust-stock action or a completed transfer, both of which write an
+// InventoryMovement row in the same transaction as the stock update.
+
+enum CategoryStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ProductStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum BranchProductStatus {
+  AVAILABLE
+  UNAVAILABLE
+}
+
+enum InventoryMovementType {
+  RESTOCK
+  SALE
+  RETURN
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+enum InventoryTransferStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Category {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name String
+  slug String
+  parentId String?
+  parent Category? @relation("CategoryToParent", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryToParent")
+
+  sortOrder Int @default(0)
+  status CategoryStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, parentId])
+}
+
+model Product {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  categoryId String?
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  name String
+  slug String
+  description String?
+  status ProductStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  variants ProductVariant[]
+  media ProductMedia[]
+  branchProducts BranchProduct[]
+  cartItems CartItem[]
+  orderItems OrderItem[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, categoryId])
+  @@index([tenantId, status])
+}
+
+model ProductVariant {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Null for the implicit single-variant case of a "simple" product.
+  name String?
+  sku String
+  // Free-form option payload, e.g. { size: "M", color: "Rojo" }.
+  attributes Json @default("{}")
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  branchProducts BranchProduct[]
+  transferItems InventoryTransferItem[]
+  cartItems CartItem[]
+  orderItems OrderItem[]
+
+  @@unique([tenantId, sku])
+  @@index([productId])
+}
+
+model ProductMedia {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  url String
+  altText String?
+  sortOrder Int @default(0)
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([productId])
+}
+
+model BranchProduct {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  // Denormalized alongside variantId (both are in the documented field list)
+  // for query convenience — always derivable via variant.productId too.
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  price Decimal @db.Decimal(10, 2)
+  compareAtPrice Decimal? @db.Decimal(10, 2)
+
+  stock Int @default(0)
+  reservedStock Int @default(0)
+  minStock Int?
+  maxStock Int?
+  reorderPoint Int?
+
+  status BranchProductStatus @default(UNAVAILABLE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  movements InventoryMovement[]
+
+  @@unique([branchId, variantId])
+  @@index([tenantId, productId])
+}
+
+model InventoryMovement {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  branchProductId String
+  branchProduct BranchProduct @relation(fields: [branchProductId], references: [id], onDelete: Cascade)
+
+  type InventoryMovementType
+  // Signed: positive = stock in, negative = stock out.
+  quantityChange Int
+  note String?
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([branchProductId, createdAt])
+}
+
+model InventoryTransfer {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  fromBranchId String
+  fromBranch Branch @relation("TransferFromBranch", fields: [fromBranchId], references: [id], onDelete: Cascade)
+
+  toBranchId String
+  toBranch Branch @relation("TransferToBranch", fields: [toBranchId], references: [id], onDelete: Cascade)
+
+  status InventoryTransferStatus @default(PENDING)
+  note String?
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  completedAt DateTime?
+
+  items InventoryTransferItem[]
+
+  @@index([tenantId, status])
+}
+
+model InventoryTransferItem {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  transferId String
+  transfer InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  quantity Int
+
+  createdAt DateTime @default(now())
+
+  @@index([transferId])
+}
+
+// Phase 10: Cart + Checkout (+ minimal Order). Checkout creates a minimal
+// Order/OrderItem now rather than deferring it to Phase 11 — Phase 11 will
+// build full order *management* (richer status lifecycle, admin screen,
+// fulfillment) on top of this foundation. Checkout "reserves" stock via
+// BranchProduct.reservedStock (already added in Phase 9) rather than
+// deducting BranchProduct.stock — actual deduction happens at fulfillment
+// (Phase 18, out of scope here). No coupon/promotion mechanism (undocumented,
+// belongs to a future Promotions phase) — only the flat `discount` field.
+
+enum CartStatus {
+  ACTIVE
+  CHECKED_OUT
+  ABANDONED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  READY
+  DELIVERED
+  CANCELLED
+}
+
+model CustomerAddress {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  label String
+  recipientName String
+  phone String
+  addressLine String
+  reference String?
+  city String?
+  zone String?
+  latitude Float?
+  longitude Float?
+  notes String?
+  isDefault Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders Order[]
+  appointments Appointment[]
+  fulfillments Fulfillment[]
+
+  @@index([tenantId, contactId])
+}
+
+model CommerceSession {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  conversationId String?
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  // Plain scalar, not a formal relation — always just the tenant's one
+  // EcommerceStore; a real FK here would add cross-module coupling for no
+  // benefit (same rationale as Contact.ownerId).
+  storeId String?
+
+  branchId String?
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  // Denormalized copy of the linked cart's id, matching the documented field
+  // list. The authoritative relation is the other direction: Cart.commerceSessionId.
+  cartId String?
+
+  // Denormalized copy of the linked appointment's id, same rationale as
+  // cartId above — the authoritative relation is Appointment.commerceSessionId.
+  appointmentId String?
+
+  metadata Json @default("{}")
+
+  // Public storefront access (magic link) — the opaque bearer secret a
+  // customer's browser presents instead of a staff JWT. High-entropy
+  // (randomBytes(32).hex), expiring, regenerable. Null until a link has
+  // ever been generated for this session.
+  publicToken String? @unique
+  publicTokenExpiresAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Was a to-one `cart Cart?` (Cart.commerceSessionId used to be @unique) —
+  // now to-many so a session can accumulate more than one Cart over its
+  // lifetime; CommerceSessionsService picks the single ACTIVE one, if any.
+  carts Cart[]
+  appointments Appointment[]
+
+  @@index([tenantId, contactId])
+}
+
+model Cart {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  // Was @unique (strict 1:1) — relaxed to a plain indexed FK so a session
+  // can accumulate more than one Cart over its lifetime (e.g. a customer
+  // checks out, then returns to the same storefront link and buys again).
+  // CommerceSessionsService.getOrCreateCart already only ever treats the
+  // single ACTIVE one as "the" cart; see its docblock.
+  commerceSessionId String
+  commerceSession CommerceSession @relation(fields: [commerceSessionId], references: [id], onDelete: Cascade)
+
+  conversationId String?
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  branchId String?
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  status CartStatus @default(ACTIVE)
+  currency String @default("BOB")
+
+  subtotal Decimal @default(0) @db.Decimal(10, 2)
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  shipping Decimal @default(0) @db.Decimal(10, 2)
+  tax Decimal @default(0) @db.Decimal(10, 2)
+  total Decimal @default(0) @db.Decimal(10, 2)
+
+  expiresAt DateTime?
+
+  // Set by the abandoned-cart scheduler scan once an "abandoned" event has
+  // been emitted for this cart, so it fires at most once (Phase 16: Workflows).
+  abandonedNotifiedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items CartItem[]
+  order Order?
+
+  @@index([tenantId, contactId, status])
+  @@index([commerceSessionId])
+}
+
+model CartItem {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  cartId String
+  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  quantity Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  subtotal Decimal @db.Decimal(10, 2)
+  metadata Json @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, variantId])
+}
+
+model Order {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  cartId String @unique
+  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  branchId String?
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  addressId String?
+  address CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+
+  // e.g. "ORD-<base36 timestamp>" — collision-proof enough for this phase; a
+  // real per-tenant sequence is a documented future refinement.
+  orderNumber String
+
+  status OrderStatus @default(CONFIRMED)
+  fulfillmentType FulfillmentType
+
+  subtotal Decimal @db.Decimal(10, 2)
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  shipping Decimal @default(0) @db.Decimal(10, 2)
+  tax Decimal @default(0) @db.Decimal(10, 2)
+  total Decimal @db.Decimal(10, 2)
+  currency String
+
+  confirmedAt DateTime?
+
+  // Operator-assigned tracking/order-ticket number ("comanda"/"guía") — free
+  // text, no format enforced (couriers and in-house tickets look nothing alike).
+  trackingCode String?
+
+  // Snapshot of whatever the storefront's navigator.geolocation call
+  // captured on CommerceSession.metadata at the moment of checkout (see
+  // CartsService.checkout) — null when the customer never shared it. Not a
+  // live/authoritative address; CustomerAddress (via addressId) remains that.
+  customerLocation Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items OrderItem[]
+  statusHistory OrderStatusHistory[]
+  fulfillment Fulfillment?
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId, contactId])
+}
+
+model OrderStatusHistory {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  fromStatus OrderStatus?
+  toStatus OrderStatus
+  note String?
+  changedByUserId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId, createdAt])
+}
+
+model OrderItem {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orderId String
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  variantId String
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  // Snapshots so a historical order doesn't change if the product is later
+  // renamed/repriced.
+  productNameSnapshot String
+  skuSnapshot String
+
+  quantity Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  discount Decimal @default(0) @db.Decimal(10, 2)
+  subtotal Decimal @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderId])
+}
+
+// Phase 12: Booking. Two independent availability layers: a BookingResource
+// (room/chair/equipment/staff) has its own recurring BookingResourceSchedule;
+// a staff User separately has a named UserSchedule (container, supports
+// future multiple named schedules) holding recurring UserScheduleInterval
+// rows plus UserTimeOff exceptions. Real availability for a STAFF resource is
+// the intersection of both layers minus time-off minus existing overlapping
+// appointments; non-STAFF resources only use the resource-schedule layer.
+
+enum BookingServiceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum BookingResourceType {
+  STAFF
+  ROOM
+  EQUIPMENT
+  OTHER
+}
+
+enum BookingResourceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UserScheduleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AppointmentStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model BookingService {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name String
+  slug String
+  description String?
+  durationMinutes Int
+  price Decimal @db.Decimal(10, 2)
+  status BookingServiceStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  qualifiedUsers BookingServiceUser[]
+  resources BookingResourceService[]
+  appointmentServices AppointmentService[]
+
+  @@unique([tenantId, slug])
+}
+
+// Composite PK join — same caveat as ContactTag/EcommerceStoreBranch: use
+// create/findFirst/findMany/deleteMany, never findUnique/delete.
+model BookingServiceUser {
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service BookingService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  userId String
+
+  @@id([serviceId, userId])
+}
+
+model BookingResource {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  name String
+  type BookingResourceType
+  // Only meaningful when type == STAFF.
+  userId String?
+  status BookingResourceStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  services BookingResourceService[]
+  schedule BookingResourceSchedule[]
+  appointmentResources AppointmentResource[]
+
+  @@index([tenantId, branchId])
+}
+
+// Composite PK join — same caveat as above.
+model BookingResourceService {
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  resourceId String
+  resource BookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service BookingService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  @@id([resourceId, serviceId])
+}
+
+model BookingResourceSchedule {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  resourceId String
+  resource BookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  dayOfWeek Int // 0=Sunday .. 6=Saturday
+  startMinute Int // minutes from midnight
+  endMinute Int
+
+  createdAt DateTime @default(now())
+
+  @@index([resourceId, dayOfWeek])
+}
+
+model UserSchedule {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  userId String
+  name String
+  timezone String @default("America/La_Paz")
+  status UserScheduleStatus @default(ACTIVE)
+  effectiveFrom DateTime?
+  effectiveTo DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  intervals UserScheduleInterval[]
+
+  @@index([tenantId, userId, status])
+}
+
+model UserScheduleInterval {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  userScheduleId String
+  userSchedule UserSchedule @relation(fields: [userScheduleId], references: [id], onDelete: Cascade)
+
+  dayOfWeek Int
+  startMinute Int
+  endMinute Int
+
+  createdAt DateTime @default(now())
+
+  @@index([userScheduleId, dayOfWeek])
+}
+
+model UserTimeOff {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  userId String
+  startAt DateTime
+  endAt DateTime
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, userId])
+}
+
+// A whole-team closure for a branch (e.g. a holiday) — distinct from
+// UserTimeOff, which is one individual's absence. Blocks every
+// BookingResource of the branch for that date, regardless of type.
+model BookingBlackoutDate {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  date DateTime @db.Date
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([branchId, date])
+  @@index([tenantId, branchId])
+}
+
+model Appointment {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  contactId String
+  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  commerceSessionId String?
+  commerceSession CommerceSession? @relation(fields: [commerceSessionId], references: [id], onDelete: SetNull)
+
+  addressId String?
+  address CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+
+  startAt DateTime
+  endAt DateTime
+  status AppointmentStatus @default(CONFIRMED)
+  notes String?
+
+  subtotal Decimal @db.Decimal(10, 2)
+  total Decimal @db.Decimal(10, 2)
+  currency String
+
+  confirmedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  services AppointmentService[]
+  resources AppointmentResource[]
+  statusHistory AppointmentStatusHistory[]
+  fulfillment Fulfillment?
+
+  @@index([tenantId, branchId, startAt])
+  @@index([tenantId, contactId])
+}
+
+model AppointmentService {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  appointmentId String
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service BookingService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+
+  // Snapshots so a historical appointment doesn't change if the service is
+  // later renamed/repriced.
+  serviceNameSnapshot String
+  priceSnapshot Decimal @db.Decimal(10, 2)
+  durationMinutesSnapshot Int
+
+  createdAt DateTime @default(now())
+
+  @@index([appointmentId])
+}
+
+// Composite PK join — same caveat as above.
+model AppointmentResource {
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  appointmentId String
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  resourceId String
+  resource BookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@id([appointmentId, resourceId])
+}
+
+model AppointmentStatusHistory {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  appointmentId String
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  fromStatus AppointmentStatus?
+  toStatus AppointmentStatus
+  note String?
+  changedByUserId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([appointmentId, createdAt])
+}
+
+// Phase 16: Workflows — event log + node/edge graph automation engine.
+//
+// Docs (DATABASE.md) list `event_subscriptions` as a separate table; here a
+// flow's TRIGGER/EVENT node *is* the subscription, so no separate join table
+// exists — a documented deviation, same kind of judgment call made in every
+// prior phase when DATABASE.md gives only bare table names with no fields.
+
+model Event {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  type String
+  payload Json @default("{}")
+
+  // Plain scalar, not a formal relation — same rationale as Contact.ownerId:
+  // avoids a hard FK when the emitting event's contact context is optional.
+  contactId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, type, createdAt])
+}
+
+enum FlowStatus {
+  DRAFT
+  ACTIVE
+  INACTIVE
+}
+
+enum FlowNodeType {
+  TRIGGER
+  CONDITION
+  ACTION
+  WAIT
+  END
+}
+
+enum FlowExecutionStatus {
+  RUNNING
+  WAITING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum FlowExecutionLogStatus {
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+model Flow {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name String
+  description String?
+  status FlowStatus @default(DRAFT)
+
+  // Who "acts" for this flow's actions (message sender, note author, status-
+  // transition actor). There's no system/bot-user concept in this codebase,
+  // so the flow's creator is the audit actor for everything it does.
+  createdByUserId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  nodes FlowNode[]
+  edges FlowEdge[]
+  executions FlowExecution[]
+
+  @@index([tenantId, status])
+}
+
+model FlowNode {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  flowId String
+  flow Flow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  type FlowNodeType
+  // TRIGGER: EVENT|SCHEDULE|MANUAL. CONDITION: FIELD_COMPARISON.
+  // ACTION: SEND_MESSAGE|ADD_TAG|REMOVE_TAG|ADD_NOTE|ASSIGN_CONVERSATION|
+  //         UPDATE_ORDER_STATUS|UPDATE_APPOINTMENT_STATUS|WEBHOOK_CALL.
+  // WAIT: DELAY. END: END.
+  subtype String
+  name String?
+  config Json @default("{}")
+
+  positionX Float @default(0)
+  positionY Float @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  outgoingEdges FlowEdge[] @relation("FlowEdgeSource")
+  incomingEdges FlowEdge[] @relation("FlowEdgeTarget")
+
+  @@index([tenantId, flowId])
+}
+
+model FlowEdge {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  flowId String
+  flow Flow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  sourceNodeId String
+  sourceNode FlowNode @relation("FlowEdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+
+  targetNodeId String
+  targetNode FlowNode @relation("FlowEdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+
+  // 'true' | 'false' for CONDITION branches; null otherwise.
+  sourceHandle String?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, flowId])
+  @@index([sourceNodeId])
+}
+
+model FlowExecution {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  flowId String
+  flow Flow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+
+  status FlowExecutionStatus @default(RUNNING)
+  triggerEventType String?
+  contextData Json @default("{}")
+  currentNodeId String?
+  errorMessage String?
+
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+
+  logs FlowExecutionLog[]
+
+  @@index([tenantId, flowId, status])
+}
+
+model FlowExecutionLog {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  executionId String
+  execution FlowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+
+  nodeId String
+  status FlowExecutionLogStatus
+  input Json?
+  output Json?
+  error String?
+
+  startedAt DateTime @default(now())
+  finishedAt DateTime?
+
+  @@index([tenantId, executionId])
+}
+
+// Phase 17: Campañas/Plantillas — real WhatsApp Business template
+// submission/approval + bulk campaign sends built on top of it.
+
+enum TemplateCategory {
+  MARKETING
+  UTILITY
+  AUTHENTICATION
+}
+
+enum TemplateStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  DISABLED
+}
+
+model MessageTemplate {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Meta's naming rule: lowercase letters, digits, underscores only.
+  // Enforced in CreateTemplateDto, not just here.
+  name String
+  category TemplateCategory
+  // Locale code, e.g. "es", "es_MX", "en_US" — free text, not an enum,
+  // matching Meta's own open-ended language list.
+  language String
+
+  headerText String?
+  // Meta's numbered placeholder convention: {{1}}, {{2}}, ... No header/
+  // footer variables and no buttons/media in this first pass — a stated
+  // simplification vs. Meta's full component set.
+  bodyText String
+  footerText String?
+
+  status TemplateStatus @default(DRAFT)
+  // Meta's own template id, set once POST .../message_templates succeeds.
+  externalTemplateId String?
+  rejectionReason String?
+  submittedAt DateTime?
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaigns Campaign[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+}
+
+model Segment {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name String
+  description String?
+  // Plain AND-of-fields filter mirroring ContactsService.list's existing
+  // shape ({status?, type?, tagIds?: string[]}) — not a full query builder,
+  // a stated simplification.
+  filterQuery Json @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  campaigns Campaign[]
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model Campaign {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name String
+  description String?
+
+  templateId String
+  template MessageTemplate @relation(fields: [templateId], references: [id])
+
+  segmentId String
+  segment Segment @relation(fields: [segmentId], references: [id])
+
+  // {"1": {source:"contact_field"|"static", value:"name"|"20%"}, ...} — how
+  // each of the template's {{n}} placeholders is resolved per recipient.
+  variableMapping Json @default("{}")
+
+  status CampaignStatus @default(DRAFT)
+  scheduledAt DateTime?
+  startedAt DateTime?
+  completedAt DateTime?
+
+  createdByUserId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recipients CampaignRecipient[]
+
+  @@index([tenantId, status])
+}
+
+enum CampaignRecipientStatus {
+  PENDING
+  SENT
+  FAILED
+  // No DELIVERED/READ — Message has no delivery-status tracking yet
+  // (explicitly deferred, see meta-webhook.service.ts), so campaigns can't
+  // report past "sent" either. Stated limitation.
+}
+
+model CampaignRecipient {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  campaignId String
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  contactId String
+
+  status CampaignRecipientStatus @default(PENDING)
+  errorMessage String?
+  sentAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([campaignId, contactId])
+  @@index([tenantId, campaignId, status])
+}
+
+// Phase 18: Manual fulfillment ("Pickup y registro de delivery"). A
+// standalone operational record kept in sync with Order.status (not a
+// second state machine — see orders.service.ts's transition()) that
+// captures what Order itself doesn't: who actually received the pickup/
+// delivery, a note, and an optional scheduled time. `appointmentId` is
+// included for forward-compatibility with DATABASE.md's documented shape
+// and Phase 19's route-stop linkage, but nothing creates one for an
+// Appointment yet — Booking has no delivery concept today.
+
+enum FulfillmentStatus {
+  PENDING
+  READY
+  COMPLETED
+  CANCELLED
+}
+
+model Fulfillment {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  orderId String? @unique
+  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  appointmentId String? @unique
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  type FulfillmentType
+  status FulfillmentStatus @default(PENDING)
+
+  branchId String?
+  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  addressId String?
+  address CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+
+  scheduledAt DateTime?
+  completedAt DateTime?
+  receivedByName String?
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+}
+
+enum PaymentMethodType {
+  CASH
+  BANK_TRANSFER
+  QR
+}
+
+// Settings-level configuration only — no payment gateway integration exists
+// (see Integraciones → Pasarelas de pago for that, still a mock card). This
+// is what the checkout/AI agent shows the customer for a manual payment:
+// which methods the business accepts and the account/QR details to pay to.
+model PaymentMethod {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  type PaymentMethodType
+  label String
+  enabled Boolean @default(true)
+  sortOrder Int @default(0)
+
+  // Free-form text shown to the customer (account number, bank name,
+  // account holder, etc.) for CASH/BANK_TRANSFER.
+  instructions String?
+  // QR code image URL (type QR), uploaded via StorageService.
+  qrImageUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// In-app notification inbox for dashboard operators. Populated two ways:
+// (1) directly by CartsService.checkout()/AppointmentsService.create() when
+// an order/appointment is born PENDING and the tenant's notifyOnXPending
+// flag is on, and (2) by the generic NOTIFY workflow action, letting an
+// operator wire up a notification for any event via Workflows.
+model Notification {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Always targeted to one user — a "broadcast" is fanned out as one row
+  // per active tenant user at creation time (NotificationsService.create()),
+  // never a shared null row, so each user's readAt is independent and a
+  // broadcast can't be marked read for everyone by one person opening it.
+  userId String
+
+  type String
+  title String
+  body String?
+  link String?
+
+  readAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, userId, createdAt])
+}
+
+// Phase 13: AI foundation. Scope deliberately excludes tools (Phase 14: AI
+// Commerce — ai_agent_tools per DATABASE.md) and RAG (Phase 15 —
+// knowledge_documents/knowledge_chunks/embeddings per DATABASE.md): an agent
+// here only holds a conversation with an LLM and auto-replies on its
+// configured channels, nothing more yet.
+
+enum AiProviderType {
+  OPENAI
+  ANTHROPIC
+  GEMINI
+}
+
+// Global catalog, NOT tenant-scoped — same rationale as Permission: shared
+// across every tenant, seeded once (see seed.ts). "Connected" status is
+// derived at query time from whether the provider's API key env var is set;
+// no raw key is ever stored here (SECURITY.md: secrets live in env vars,
+// never committed/stored in the DB).
+model AiProvider {
+  id String @id @default(cuid())
+  type AiProviderType @unique
+  label String
+
+  models AiModel[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum AiModelStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model AiModel {
+  id String @id @default(cuid())
+
+  providerId String
+  provider AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  name String // literal model id sent to the provider's API, e.g. "gpt-4o-mini"
+  label String // e.g. "GPT-4o mini"
+  capabilities String[] // e.g. ["text", "vision"] — AI_SPEC.md's Providers capability list
+  // INACTIVE for models of a not-yet-wired provider (Anthropic/Gemini) so the
+  // Agent form only offers models that can actually run a completion today.
+  status AiModelStatus @default(ACTIVE)
+
+  agents AiAgent[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([providerId, name])
+}
+
+enum AiAgentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model AiAgent {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name String
+  // Starts INACTIVE — a tenant must deliberately activate an agent (and pick
+  // its channels below) before anything auto-replies to a real customer.
+  status AiAgentStatus @default(INACTIVE)
+
+  modelId String
+  model AiModel @relation(fields: [modelId], references: [id])
+
+  temperature Float @default(0.7)
+  goal String?
+  personality String?
+  language String @default("es")
+
+  // Plain scalar array rather than a join table (the BookingServiceUser/
+  // EcommerceStoreBranch convention elsewhere): there's a fixed, tiny enum
+  // domain here with no per-pairing data, so a join table would add a model
+  // for no benefit. An inbound message on a channel only triggers a reply
+  // when the tenant has exactly one ACTIVE agent listing that channel here.
+  channels Channel[]
+
+  // Case-insensitive substring match against the incoming message text; a
+  // match skips the auto-reply entirely, leaving the conversation for a
+  // human — a minimal stand-in for AI_SPEC.md's Agent "escalation" property.
+  escalationKeywords String[] @default([])
+
+  maxTokens Int @default(500)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usage AiUsage[]
+  knowledgeDocuments AiAgentKnowledgeDocument[]
+
+  @@index([tenantId, status])
+}
+
+// One row per completion call — the "ai_usage" table DATABASE.md's
+// Inventory/Automation/AI catalog lists, scoped to token/cost visibility
+// (no dashboard UI beyond a simple summary in this phase).
+model AiUsage {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  agentId String
+  agent AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  // Plain scalar, not a formal relation — same rationale as Contact.ownerId
+  // (the conversation may be deleted long after usage rows are kept for
+  // billing history).
+  conversationId String?
+
+  promptTokens Int
+  completionTokens Int
+  totalTokens Int
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
+
+// Phase 15: RAG. IMPORTANT deviation from AI_SPEC.md/CLAUDE.md's stated
+// "PostgreSQL + pgvector" stack: the `vector` extension binary is not
+// installed on this Postgres server (`CREATE EXTENSION vector` fails —
+// installing it needs root/apt access this environment doesn't have), so
+// embeddings are stored as a plain JSON float array and similarity is
+// computed in application code (KnowledgeSearchService), not via pgvector's
+// `<=>` operator. Fine at the scale a single tenant's knowledge base runs at
+// (linear scan over a few hundred/thousand chunks is milliseconds). Moving
+// to a real `vector` column + SQL nearest-neighbor search later only touches
+// the storage column and KnowledgeSearchService's query — not the chunking/
+// embedding pipeline or any API contract.
+
+enum KnowledgeDocumentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model KnowledgeDocument {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  title String
+  content String
+  // INACTIVE documents are kept but excluded from retrieval — lets an
+  // operator retire outdated content without losing it.
+  status KnowledgeDocumentStatus @default(ACTIVE)
+
+  chunks KnowledgeChunk[]
+  agents AiAgentKnowledgeDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+}
+
+model KnowledgeChunk {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  documentId String
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  content String
+  chunkIndex Int
+  // JSON array of floats — see the Phase 15 comment above.
+  embedding Json
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, documentId])
+}
+
+// Composite PK join — same caveat as ContactTag/BookingServiceUser: use
+// create/findFirst/findMany/deleteMany, never findUnique/delete.
+model AiAgentKnowledgeDocument {
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  agentId String
+  agent AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  documentId String
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@id([agentId, documentId])
 }

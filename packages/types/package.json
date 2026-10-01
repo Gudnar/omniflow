@@ -3,11 +3,24 @@
   "version": "0.1.0",
   "private": true,
   "description": "Shared TypeScript types and interfaces",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./errors": "./src/errors.ts",
-    "./api": "./src/api.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "default": "./dist/errors.js"
+    },
+    "./api": {
+      "types": "./dist/api.d.ts",
+      "default": "./dist/api.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
   },
   "devDependencies": {
     "typescript": "^5.3.0"

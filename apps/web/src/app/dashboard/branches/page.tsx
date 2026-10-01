@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@omniflow/ui';
 import { useAuth } from '@/lib/auth-context';
-import { Plus, Edit2, Trash2, Building2 } from 'lucide-react';
+import { useToast } from '@/lib/toast-context';
+import { Plus, Edit2, Trash2, Building2, MapPin, Loader2 } from 'lucide-react';
 
 interface Branch {
   id: string;
@@ -12,18 +13,64 @@ interface Branch {
   slug: string;
   status: 'ACTIVE' | 'INACTIVE';
   address?: string;
+  latitude?: number | null;
+  longitude?: number | null;
   timezone?: string;
   createdAt: string;
 }
 
+const EMPTY_FORM = { name: '', address: '', latitude: '', longitude: '', timezone: 'UTC' };
+
 export default function BranchesPage() {
   const router = useRouter();
+  const toast = useToast();
   const { user, tokens, isLoading } = useAuth();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [formData, setFormData] = useState({ name: '', address: '', timezone: 'UTC' });
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [locating, setLocating] = useState(false);
+
+  const buildPayload = () => ({
+    name: formData.name,
+    address: formData.address,
+    timezone: formData.timezone,
+    latitude: formData.latitude.trim() ? Number(formData.latitude) : undefined,
+    longitude: formData.longitude.trim() ? Number(formData.longitude) : undefined,
+  });
+
+  const useMyLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error('Tu navegador no soporta geolocalización.');
+      return;
+    }
+    // The Geolocation API silently refuses to even prompt outside a secure
+    // context (HTTPS or localhost) — this is almost certainly why the
+    // button looked like it "did nothing": no permission dialog ever
+    // appeared, and the old code had no error branch to surface that.
+    if (!window.isSecureContext) {
+      toast.error('El navegador bloquea la ubicación en este sitio porque no es HTTPS ni localhost.');
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setFormData((f) => ({ ...f, latitude: String(pos.coords.latitude), longitude: String(pos.coords.longitude) }));
+        setLocating(false);
+      },
+      (err) => {
+        setLocating(false);
+        const messages: Record<number, string> = {
+          1: 'Denegaste el permiso de ubicación. Habilítalo para este sitio en la configuración del navegador.',
+          2: 'No se pudo determinar tu ubicación actual.',
+          3: 'Se agotó el tiempo de espera al obtener tu ubicación.',
+        };
+        toast.error(messages[err.code] ?? 'No se pudo obtener tu ubicación.');
+      },
+      { timeout: 10000 },
+    );
+  };
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -63,12 +110,12 @@ export default function BranchesPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${tokens?.accessToken}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(buildPayload()),
       });
       if (res.ok) {
         await fetchBranches();
         setShowModal(false);
-        setFormData({ name: '', address: '', timezone: 'UTC' });
+        setFormData(EMPTY_FORM);
       }
     } catch (err) {
       console.error('Error creating branch:', err);
@@ -84,13 +131,13 @@ export default function BranchesPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${tokens?.accessToken}`,
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(buildPayload()),
       });
       if (res.ok) {
         await fetchBranches();
         setShowModal(false);
         setEditingId(null);
-        setFormData({ name: '', address: '', timezone: 'UTC' });
+        setFormData(EMPTY_FORM);
       }
     } catch (err) {
       console.error('Error updating branch:', err);
@@ -119,6 +166,8 @@ export default function BranchesPage() {
     setFormData({
       name: branch.name,
       address: branch.address || '',
+      latitude: branch.latitude != null ? String(branch.latitude) : '',
+      longitude: branch.longitude != null ? String(branch.longitude) : '',
       timezone: branch.timezone || 'UTC',
     });
     setShowModal(true);
@@ -147,7 +196,7 @@ export default function BranchesPage() {
           <Button
             onClick={() => {
               setEditingId(null);
-              setFormData({ name: '', address: '', timezone: 'UTC' });
+              setFormData(EMPTY_FORM);
               setShowModal(true);
             }}
             className="bg-blue-600 hover:bg-blue-700 text-white flex gap-2"
@@ -167,7 +216,7 @@ export default function BranchesPage() {
             <Button
               onClick={() => {
                 setEditingId(null);
-                setFormData({ name: '', address: '', timezone: 'UTC' });
+                setFormData(EMPTY_FORM);
                 setShowModal(true);
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white mx-auto flex gap-2"
@@ -262,6 +311,42 @@ export default function BranchesPage() {
               </div>
 
               <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-sm font-medium text-gray-900">Coordenadas (opcional)</label>
+                  <button
+                    type="button"
+                    onClick={useMyLocation}
+                    disabled={locating}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1 disabled:opacity-50"
+                  >
+                    {locating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <MapPin className="w-3.5 h-3.5" />}
+                    Usar mi ubicación actual
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mb-2">
+                  Configúralas para que la tienda en línea pueda dirigir al cliente a la sucursal más cercana.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.latitude}
+                    onChange={(e) => setFormData({ ...formData, latitude: e.target.value })}
+                    placeholder="Latitud"
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.longitude}
+                    onChange={(e) => setFormData({ ...formData, longitude: e.target.value })}
+                    placeholder="Longitud"
+                    className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div>
                 <label className="block text-sm font-medium text-gray-900 mb-2">Zona Horaria</label>
                 <select
                   value={formData.timezone}
@@ -284,7 +369,7 @@ export default function BranchesPage() {
                 onClick={() => {
                   setShowModal(false);
                   setEditingId(null);
-                  setFormData({ name: '', address: '', timezone: 'UTC' });
+                  setFormData(EMPTY_FORM);
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 font-medium"
               >

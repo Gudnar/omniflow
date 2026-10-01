@@ -32,7 +32,7 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto): Promise<AuthResponse> {
-    const existingUser = await this.prisma.client.user.findUnique({
+    const existingUser = await this.prisma.raw.user.findUnique({
       where: { email: dto.email },
     });
 
@@ -45,7 +45,9 @@ export class AuthService {
     const passwordHash = await hash(dto.password);
     let tenantSlug = this.generateSlug(dto.tenantName);
 
-    const result = await this.prisma.client.$transaction(async (tx: any) => {
+    // Uses the raw (unscoped) client: the tenant doesn't exist yet, so there is
+    // no tenant context to scope by. Every operation below sets tenantId explicitly.
+    const result = await this.prisma.raw.$transaction(async (tx: any) => {
       let tenant;
       let retries = 0;
       const maxRetries = 5;
@@ -128,7 +130,7 @@ export class AuthService {
   async login(
     dto: LoginDto,
   ): Promise<AuthResponse | { mfaChallengeToken: string; expiresIn: number }> {
-    const user = await this.prisma.client.user.findUnique({
+    const user = await this.prisma.raw.user.findUnique({
       where: { email: dto.email },
       include: {
         tenant: true,
@@ -180,7 +182,7 @@ export class AuthService {
   }
 
   async refresh(dto: RefreshTokenDto): Promise<AuthTokens> {
-    const tokenRecord = await this.prisma.client.refreshToken.findUnique({
+    const tokenRecord = await this.prisma.raw.refreshToken.findUnique({
       where: { tokenHash: this.hashToken(dto.refreshToken) },
       include: {
         user: {
@@ -211,20 +213,20 @@ export class AuthService {
       tokenRecord.user.roles,
     );
 
+    // generateTokens() above already persisted a RefreshToken row for
+    // newTokens.refreshToken — look it up rather than creating a second row
+    // with the same tokenHash (that used to throw a unique-constraint
+    // violation on every refresh, since nothing exercised this path before
+    // the frontend gained refresh-on-401 logic in Phase 16).
+    const newTokenRecord = await this.prisma.client.refreshToken.findUnique({
+      where: { tokenHash: this.hashToken(newTokens.refreshToken) },
+    });
+
     await this.prisma.client.refreshToken.update({
       where: { id: tokenRecord.id },
       data: {
         revokedAt: new Date(),
-        replacedByTokenId: (
-          await this.prisma.client.refreshToken.create({
-            data: {
-              userId: tokenRecord.user.id,
-              tenantId: tokenRecord.user.tenantId,
-              tokenHash: this.hashToken(newTokens.refreshToken),
-              expiresAt: this.getExpiresAt(this.refreshTokenExpiresIn),
-            },
-          })
-        ).id,
+        replacedByTokenId: newTokenRecord?.id,
       },
     });
 
@@ -335,6 +337,11 @@ export class AuthService {
     if (payload.type !== 'mfa-challenge') {
       throw new UnauthorizedError('Invalid token type');
     }
+
+    this.tenantContext.setContext({
+      tenantId: payload.tenantId,
+      userId: payload.sub,
+    });
 
     const user = await this.prisma.client.user.findUnique({
       where: { id: payload.sub },

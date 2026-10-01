@@ -1,139 +1,112 @@
 'use client';
 
 import { useAuth } from '@/lib/auth-context';
-import { Building2, MessageCircle, TrendingUp } from 'lucide-react';
-import Link from 'next/link';
+import { Users, MessageSquare, ShoppingBag, DollarSign, CalendarDays, Calendar } from 'lucide-react';
+import { StatCard } from '@/components/dashboard/widgets/stat-card';
+import { ChannelDonut } from '@/components/dashboard/widgets/channel-donut';
+import { SalesFunnel } from '@/components/dashboard/widgets/sales-funnel';
+import { UpcomingAppointments } from '@/components/dashboard/widgets/upcoming-appointments';
+import { RecentLeads } from '@/components/dashboard/widgets/recent-leads';
+import { SalesByBranch } from '@/components/dashboard/widgets/sales-by-branch';
+import { RecentActivity } from '@/components/dashboard/widgets/recent-activity';
+import { QuickActions } from '@/components/dashboard/widgets/quick-actions';
+
+const stats = [
+  {
+    icon: Users,
+    iconBg: '#dcfce7',
+    iconColor: '#16a34a',
+    label: 'Nuevos Leads',
+    value: '1,250',
+    change: '18.5%',
+    sparklineColor: '#22c55e',
+    sparklineData: [4, 6, 5, 8, 7, 10, 9, 12, 11, 14],
+  },
+  {
+    icon: MessageSquare,
+    iconBg: '#dbeafe',
+    iconColor: '#2563eb',
+    label: 'Conversaciones',
+    value: '3,842',
+    change: '22.7%',
+    sparklineColor: '#3b82f6',
+    sparklineData: [8, 7, 10, 9, 13, 11, 15, 14, 17, 19],
+  },
+  {
+    icon: ShoppingBag,
+    iconBg: '#ede9fe',
+    iconColor: '#7c3aed',
+    label: 'Ventas (Pedidos)',
+    value: '532',
+    change: '15.3%',
+    sparklineColor: '#a855f7',
+    sparklineData: [5, 6, 5, 7, 6, 8, 9, 8, 10, 11],
+  },
+  {
+    icon: DollarSign,
+    iconBg: '#fef3c7',
+    iconColor: '#d97706',
+    label: 'Ingresos',
+    value: 'Bs. 245,780',
+    change: '20.1%',
+    sparklineColor: '#f59e0b',
+    sparklineData: [6, 8, 7, 9, 8, 11, 10, 13, 12, 15],
+  },
+  {
+    icon: CalendarDays,
+    iconBg: '#fce7f3',
+    iconColor: '#db2777',
+    label: 'Citas Reservadas',
+    value: '158',
+    change: '12.8%',
+    sparklineColor: '#ec4899',
+    sparklineData: [3, 4, 4, 5, 5, 6, 6, 7, 7, 8],
+  },
+];
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const firstName = user?.email?.split('@')[0] || 'Admin';
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">¡Bienvenido a OmniFlow!</h1>
-        <p className="text-gray-600">Conecta, gestiona y haz crecer tu negocio con IA</p>
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 space-y-6">
+      {/* Welcome header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            ¡Bienvenido, {firstName.charAt(0).toUpperCase() + firstName.slice(1)}! 👋
+          </h1>
+          <p className="text-gray-500 text-sm mt-1">Aquí tienes un resumen general de tu negocio.</p>
+        </div>
+        <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition self-start sm:self-auto">
+          <Calendar className="w-4 h-4 text-gray-400" />
+          1 Jun - 7 Jun, 2025
+        </button>
       </div>
 
-      {/* Quick stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-600 font-medium">Sucursales Activas</h3>
-            <Building2 className="w-8 h-8 text-blue-600" />
-          </div>
-          <p className="text-3xl font-bold text-gray-900">0</p>
-          <p className="text-sm text-gray-500 mt-2">Comienza creando tu primera sucursal</p>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-600 font-medium">Usuarios</h3>
-            <MessageCircle className="w-8 h-8 text-green-600" />
-          </div>
-          <p className="text-3xl font-bold text-gray-900">1</p>
-          <p className="text-sm text-gray-500 mt-2">Invita a tu equipo</p>
-        </div>
-
-        <div className="bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-gray-600 font-medium">Estado</h3>
-            <TrendingUp className="w-8 h-8 text-purple-600" />
-          </div>
-          <p className="text-3xl font-bold text-gray-900">✓</p>
-          <p className="text-sm text-gray-500 mt-2">Sistema operativo</p>
-        </div>
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        {stats.map((s) => (
+          <StatCard key={s.label} {...s} />
+        ))}
       </div>
 
-      {/* Welcome card */}
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-8 text-white mb-8">
-        <h2 className="text-2xl font-bold mb-4">Configuración inicial</h2>
-        <p className="mb-6 text-blue-100">
-          Sigue estos pasos para empezar a usar OmniFlow al máximo potencial:
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-            <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-full mb-3 font-bold">
-              1
-            </div>
-            <h3 className="font-semibold mb-2">Crear Sucursal</h3>
-            <p className="text-sm text-blue-100 mb-4">Comienza agregando tu primer sucursal o ubicación</p>
-            <Link
-              href="/dashboard/branches"
-              className="text-sm font-semibold text-white hover:text-blue-100 flex items-center gap-1"
-            >
-              Ir →
-            </Link>
-          </div>
-
-          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-            <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-full mb-3 font-bold">
-              2
-            </div>
-            <h3 className="font-semibold mb-2">Invitar Usuarios</h3>
-            <p className="text-sm text-blue-100 mb-4">Agrega a tu equipo con los roles apropiados</p>
-            <button className="text-sm font-semibold text-white hover:text-blue-100 flex items-center gap-1">
-              Próximamente →
-            </button>
-          </div>
-
-          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-            <div className="flex items-center justify-center w-8 h-8 bg-white/20 rounded-full mb-3 font-bold">
-              3
-            </div>
-            <h3 className="font-semibold mb-2">Configurar Canales</h3>
-            <p className="text-sm text-blue-100 mb-4">Conecta WhatsApp, Instagram y otros canales</p>
-            <button className="text-sm font-semibold text-white hover:text-blue-100 flex items-center gap-1">
-              Próximamente →
-            </button>
-          </div>
-        </div>
+      {/* Row 2: donut + funnel + appointments */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-stretch">
+        <ChannelDonut />
+        <SalesFunnel />
+        <UpcomingAppointments />
       </div>
 
-      {/* Resources */}
-      <div className="bg-white rounded-lg border border-gray-200 p-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Recursos de Ayuda</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <a href="#" className="flex items-center gap-4 p-4 rounded-lg hover:bg-gray-50 transition border border-gray-200">
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              📖
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Documentación</h3>
-              <p className="text-sm text-gray-600">Lee la guía completa de OmniFlow</p>
-            </div>
-          </a>
-
-          <a href="#" className="flex items-center gap-4 p-4 rounded-lg hover:bg-gray-50 transition border border-gray-200">
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              💬
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Soporte</h3>
-              <p className="text-sm text-gray-600">Contacta a nuestro equipo de soporte</p>
-            </div>
-          </a>
-
-          <a href="#" className="flex items-center gap-4 p-4 rounded-lg hover:bg-gray-50 transition border border-gray-200">
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              🎓
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Tutoriales</h3>
-              <p className="text-sm text-gray-600">Aprende con nuestros videos paso a paso</p>
-            </div>
-          </a>
-
-          <a href="#" className="flex items-center gap-4 p-4 rounded-lg hover:bg-gray-50 transition border border-gray-200">
-            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
-              🚀
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900">Changelog</h3>
-              <p className="text-sm text-gray-600">Mira las últimas actualizaciones</p>
-            </div>
-          </a>
-        </div>
+      {/* Row 3: leads + sales by branch + activity */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 items-stretch">
+        <RecentLeads />
+        <SalesByBranch />
+        <RecentActivity />
       </div>
+
+      {/* Quick actions */}
+      <QuickActions />
     </div>
   );
 }

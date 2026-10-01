@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
-pnpm-lock.yaml
+# pnpm-lock.yaml is intentionally NOT ignored — committing it is what makes
+# `pnpm install --frozen-lockfile` on the production server reproduce the
+# exact same dependency versions used in development.
 package-lock.json
 yarn.lock
 
@@ -28,6 +30,11 @@ out/
 **/*.d.ts.map
 **/*.js.map
 
+# Generated Prisma Client — fully reproduced by `prisma generate` (wired
+# into packages/database's own build script); committing it risks exactly
+# the "stale client after a schema change" bugs seen during development.
+packages/database/src/prisma/
+
 # Testing
 coverage/
 .nyc_output/
@@ -42,3 +49,18 @@ yarn-debug.log*
 .env.test.local
 .cache
 tmp/
+
+# Claude Code's own local tooling config/session data — not part of the app
+.claude/
+
+# Loose reference/mockup screenshots left at the project root during
+# development — not application assets
+/*.png
+
+# TypeScript incremental build cache — machine-specific, regenerated on build
+tsconfig.tsbuildinfo
+**/tsconfig.tsbuildinfo
+
+# Locally-stored uploads (StorageService — no S3 configured in dev)
+apps/api/uploads/*
+!apps/api/uploads/.gitkeep

@@ -3,7 +3,9 @@ import { ClsService } from 'nestjs-cls';
 
 export interface TenantContextData {
   tenantId: string;
-  userId: string;
+  // Optional: webhook-driven flows (e.g. WhatsApp) resolve a tenant with no
+  // acting user.
+  userId?: string;
 }
 
 @Injectable()
