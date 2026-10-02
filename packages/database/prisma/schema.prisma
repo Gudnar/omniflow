@@ -88,7 +88,9 @@ model Tenant {
   messages Message[]
   attachments Attachment[]
   metaConnections MetaConnection[]
+  metaAppCredential TenantMetaAppCredential?
   tikTokConnection TikTokConnection?
+  aiCredentials TenantAiCredential[]
   ecommerceStore EcommerceStore?
   ecommerceStoreSettings EcommerceStoreSettings[]
   ecommerceSections EcommerceSection[]
@@ -728,6 +730,37 @@ model MetaConnection {
   @@unique([tenantId, channel])
   @@unique([channel, externalAccountId])
   @@index([status])
+}
+
+// A tenant's OWN Meta Developer App (WhatsApp Business Platform "Option B":
+// bring-your-own-app, vs. the platform's shared App used by connections
+// above). One per tenant — not per channel — since a single Meta App
+// already covers WhatsApp + Instagram + Messenger + Facebook comments.
+// Only needed for webhook signature verification (MetaWebhookController's
+// /webhooks/meta/c/:webhookPathId route); sending still uses the per-
+// channel MetaConnection.accessToken above, unaffected by this.
+model TenantMetaAppCredential {
+  id String @id @default(cuid())
+  tenantId String @unique
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  appId String
+  // AES-256-GCM via packages/utils/crypto.ts — this is the one credential in
+  // this feature set that, if leaked, lets someone forge webhook payloads
+  // claiming to be Meta, so it does NOT get the "plaintext, documented debt"
+  // treatment MetaConnection.accessToken above has.
+  appSecretEncrypted String
+
+  // System-generated (never typed by the tenant) — compared against
+  // hub.verify_token on the GET handshake for this tenant's webhook URL.
+  webhookVerifyToken String
+  // Opaque id forming this tenant's unique webhook URL segment — never the
+  // raw tenantId, to avoid exposing/enumerating it in a URL pasted into a
+  // third party's (the tenant's own) Meta App dashboard.
+  webhookPathId String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // Phase 27: Facebook Page comments. Deliberately NOT modeled as
@@ -2291,9 +2324,33 @@ model AiProvider {
   label String
 
   models AiModel[]
+  tenantCredentials TenantAiCredential[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// A tenant's OWN API key for a given provider — replaces the old
+// process.env.OPENAI_API_KEY global (shared across every tenant, no cost/
+// rate-limit isolation). AiReplyService resolves this per tenant+provider
+// before calling the adapter; with none configured, that tenant's agents
+// simply don't reply (no platform fallback key, by design — see
+// AiReplyService's own comment for the rationale). apiKeyEncrypted is
+// AES-256-GCM via packages/utils/crypto.ts, never stored in plaintext.
+model TenantAiCredential {
+  id String @id @default(cuid())
+  tenantId String
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  providerId String
+  provider AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  apiKeyEncrypted String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, providerId])
 }
 
 enum AiModelStatus {

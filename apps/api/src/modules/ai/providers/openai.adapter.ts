@@ -39,22 +39,22 @@ export interface LlmCompletionResult {
 @Injectable()
 export class OpenAiAdapter {
   async complete(params: {
+    apiKey: string;
     model: string;
     messages: LlmMessage[];
     temperature: number;
     maxTokens: number;
     tools?: LlmTool[];
   }): Promise<LlmCompletionResult> {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      throw new ValidationError('OpenAI is not configured (missing OPENAI_API_KEY)');
+    if (!params.apiKey) {
+      throw new ValidationError('OpenAI is not configured for this tenant');
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${params.apiKey}`,
       },
       body: JSON.stringify({
         model: params.model,

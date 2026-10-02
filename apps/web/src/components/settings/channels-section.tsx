@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Loader2, CheckCircle2, XCircle, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost, apiDelete, ApiError } from '@/lib/api-client';
@@ -68,6 +68,15 @@ interface TikTokConnectionData {
   status: 'CONNECTED' | 'DISCONNECTED';
 }
 
+// Opción B — "trae tu propia App de Meta": configurado una sola vez por
+// tenant (no por canal), independiente de MetaConnectionData arriba. El
+// appSecret nunca vuelve del backend, ni siquiera enmascarado.
+interface TenantMetaAppData {
+  appId: string;
+  webhookUrl: string;
+  webhookVerifyToken: string;
+}
+
 type ConnectionState =
   | { loading: true }
   | { loading: false; connected: false }
@@ -107,6 +116,65 @@ export function ChannelsSection() {
   const [form, setForm] = useState<Record<string, string>>({});
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+
+  const [metaApp, setMetaApp] = useState<TenantMetaAppData | null>(null);
+  const [metaAppLoading, setMetaAppLoading] = useState(true);
+  const [metaAppExpanded, setMetaAppExpanded] = useState(false);
+  const [metaAppForm, setMetaAppForm] = useState({ appId: '', appSecret: '' });
+  const [savingMetaApp, setSavingMetaApp] = useState(false);
+
+  const refetchMetaApp = async () => {
+    setMetaAppLoading(true);
+    try {
+      const data = await apiGet<TenantMetaAppData>('/channels/meta-app', tokens?.accessToken);
+      setMetaApp(data);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 404) {
+        setMetaApp(null);
+      } else {
+        console.error('Error fetching tenant Meta App:', err);
+      }
+    } finally {
+      setMetaAppLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!tokens) return;
+    refetchMetaApp();
+  }, [tokens]);
+
+  const copyToClipboard = (value: string, label: string) => {
+    navigator.clipboard.writeText(value).then(() => toast.success(`${label} copiado al portapapeles`));
+  };
+
+  const saveMetaApp = async () => {
+    if (!metaAppForm.appId.trim() || (!metaApp && !metaAppForm.appSecret.trim())) return;
+    setSavingMetaApp(true);
+    try {
+      const payload: Record<string, string> = { appId: metaAppForm.appId };
+      if (metaAppForm.appSecret.trim()) payload.appSecret = metaAppForm.appSecret;
+      await apiPost('/channels/meta-app', tokens?.accessToken, payload);
+      await refetchMetaApp();
+      setMetaAppForm({ appId: '', appSecret: '' });
+      toast.success('App de Meta configurada — copia la URL y el token abajo');
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo guardar tu App de Meta');
+    } finally {
+      setSavingMetaApp(false);
+    }
+  };
+
+  const disconnectMetaApp = async () => {
+    if (!confirm('¿Desconectar tu propia App de Meta? Deberás configurarla de nuevo para volver a usarla.')) return;
+    try {
+      await apiDelete('/channels/meta-app', tokens?.accessToken);
+      setMetaApp(null);
+      toast.success('App de Meta desconectada');
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo desconectar tu App de Meta');
+    }
+  };
 
   const refetch = async (key: ChannelKey) => {
     setStates((prev) => ({ ...prev, [key]: { loading: true } }));
@@ -329,6 +397,61 @@ export function ChannelsSection() {
           </div>
         )}
 
+        {modalChannel && modalChannel !== 'tiktok' && !metaAppLoading && (
+          <div className="mt-4 border border-gray-200 rounded-lg overflow-hidden">
+            {metaApp ? (
+              <div className="p-4 bg-emerald-50/40">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-emerald-800 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4" /> Usando tu propia App de Meta ({metaApp.appId})
+                  </p>
+                  <button onClick={disconnectMetaApp} className="text-xs font-medium text-red-600 hover:text-red-700">
+                    Desconectar
+                  </button>
+                </div>
+                <p className="text-xs text-gray-600 mt-2">
+                  Pega esta URL y este token en tu App de Meta → WhatsApp/Instagram/Messenger → Configuration → Webhook, y
+                  hacé clic en &quot;Verify and Save&quot; allá.
+                </p>
+                <CopyField label="URL de webhook" value={metaApp.webhookUrl} onCopy={copyToClipboard} />
+                <CopyField label="Token de verificación" value={metaApp.webhookVerifyToken} onCopy={copyToClipboard} />
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => setMetaAppExpanded((v) => !v)}
+                  className="w-full flex items-center justify-between gap-2 p-3 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <span>¿Tienes tu propia App de Meta?</span>
+                  {metaAppExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+                {metaAppExpanded && (
+                  <div className="p-4 border-t border-gray-100 space-y-3">
+                    <p className="text-xs text-gray-500">
+                      Si prefieres usar tu propia App de Meta Developer en vez de depender de la nuestra, configúrala
+                      aquí una sola vez — cubre WhatsApp, Instagram, Messenger y Facebook Comentarios a la vez.
+                    </p>
+                    <FormField label="App ID" value={metaAppForm.appId} onChange={(v) => setMetaAppForm({ ...metaAppForm, appId: v })} />
+                    <FormField
+                      label="App Secret"
+                      value={metaAppForm.appSecret}
+                      onChange={(v) => setMetaAppForm({ ...metaAppForm, appSecret: v })}
+                    />
+                    <button
+                      onClick={saveMetaApp}
+                      disabled={savingMetaApp || !metaAppForm.appId.trim() || !metaAppForm.appSecret.trim()}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white rounded-lg font-semibold text-sm disabled:opacity-60"
+                    >
+                      {savingMetaApp && <Loader2 className="w-4 h-4 animate-spin" />}
+                      Guardar y generar mi webhook
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         {testResult && (
           <div
             className={`mt-4 flex items-start gap-2 px-3 py-2.5 rounded-lg text-sm ${
@@ -387,6 +510,26 @@ function FormField({
         placeholder={placeholder}
         className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
+    </div>
+  );
+}
+
+function CopyField({ label, value, onCopy }: { label: string; value: string; onCopy: (value: string, label: string) => void }) {
+  return (
+    <div className="mt-2">
+      <label className="block text-xs font-medium text-gray-700 mb-1">{label}</label>
+      <div className="flex items-center gap-2">
+        <code className="flex-1 min-w-0 truncate px-2.5 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-800">
+          {value}
+        </code>
+        <button
+          onClick={() => onCopy(value, label)}
+          className="p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 shrink-0"
+          title={`Copiar ${label.toLowerCase()}`}
+        >
+          <Copy className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   );
 }

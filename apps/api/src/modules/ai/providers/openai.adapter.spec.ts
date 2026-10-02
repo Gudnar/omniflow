@@ -3,7 +3,6 @@ import { ValidationError } from '@omniflow/utils';
 
 describe('OpenAiAdapter', () => {
   let adapter: OpenAiAdapter;
-  const originalEnv = process.env.OPENAI_API_KEY;
   const originalFetch = global.fetch;
 
   beforeEach(() => {
@@ -11,28 +10,24 @@ describe('OpenAiAdapter', () => {
   });
 
   afterEach(() => {
-    process.env.OPENAI_API_KEY = originalEnv;
     global.fetch = originalFetch;
   });
 
-  it('throws ValidationError when OPENAI_API_KEY is not set', async () => {
-    delete process.env.OPENAI_API_KEY;
+  it('throws ValidationError when no apiKey is given', async () => {
     await expect(
-      adapter.complete({ model: 'gpt-4o-mini', messages: [], temperature: 0.7, maxTokens: 500 }),
+      adapter.complete({ apiKey: '', model: 'gpt-4o-mini', messages: [], temperature: 0.7, maxTokens: 500 }),
     ).rejects.toThrow(ValidationError);
   });
 
   it('throws when the OpenAI API responds with a non-OK status', async () => {
-    process.env.OPENAI_API_KEY = 'sk-test';
     global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401, text: () => Promise.resolve('unauthorized') }) as any;
 
     await expect(
-      adapter.complete({ model: 'gpt-4o-mini', messages: [], temperature: 0.7, maxTokens: 500 }),
+      adapter.complete({ apiKey: 'sk-test', model: 'gpt-4o-mini', messages: [], temperature: 0.7, maxTokens: 500 }),
     ).rejects.toThrow('OpenAI completion failed: 401 unauthorized');
   });
 
   it('parses content and token usage from a successful response', async () => {
-    process.env.OPENAI_API_KEY = 'sk-test';
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: () =>
@@ -43,6 +38,7 @@ describe('OpenAiAdapter', () => {
     }) as any;
 
     const result = await adapter.complete({
+      apiKey: 'sk-test',
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'hola' }],
       temperature: 0.7,
@@ -60,13 +56,12 @@ describe('OpenAiAdapter', () => {
   });
 
   it('omits tools/tool_choice from the request body when no tools are given', async () => {
-    process.env.OPENAI_API_KEY = 'sk-test';
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ choices: [{ message: { content: 'hola' } }], usage: {} }),
     }) as any;
 
-    await adapter.complete({ model: 'gpt-4o-mini', messages: [], temperature: 0.7, maxTokens: 500 });
+    await adapter.complete({ apiKey: 'sk-test', model: 'gpt-4o-mini', messages: [], temperature: 0.7, maxTokens: 500 });
 
     const [, init] = (global.fetch as jest.Mock).mock.calls[0];
     const body = JSON.parse(init.body);
@@ -75,7 +70,6 @@ describe('OpenAiAdapter', () => {
   });
 
   it('translates tools into the OpenAI function-calling shape and parses tool_calls back', async () => {
-    process.env.OPENAI_API_KEY = 'sk-test';
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: () =>
@@ -93,6 +87,7 @@ describe('OpenAiAdapter', () => {
     }) as any;
 
     const result = await adapter.complete({
+      apiKey: 'sk-test',
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: 'quiero comprar' }],
       temperature: 0.7,

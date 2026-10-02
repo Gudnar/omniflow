@@ -6,6 +6,7 @@ import { MessagesService } from '../conversations/messages.service';
 import { OpenAiAdapter, LlmMessage, LlmTool } from './providers/openai.adapter';
 import { KnowledgeSearchService } from '../knowledge/knowledge-search.service';
 import { ContactCommerceService } from '../commerce/contact-commerce.service';
+import { AiCredentialsService } from './ai-credentials.service';
 
 const HISTORY_LIMIT = 20;
 const SEND_STOREFRONT_LINK_TOOL = 'send_storefront_link';
@@ -72,6 +73,7 @@ export class AiReplyService {
     private openAiAdapter: OpenAiAdapter,
     private knowledgeSearchService: KnowledgeSearchService,
     private contactCommerceService: ContactCommerceService,
+    private aiCredentialsService: AiCredentialsService,
   ) {}
 
   async generateReply(tenantId: string, conversationId: string, messageId: string): Promise<void> {
@@ -96,6 +98,13 @@ export class AiReplyService {
 
     // Only OpenAI has a real adapter in this phase (see OpenAiAdapter).
     if (agent.model.provider.type !== 'OPENAI') return;
+
+    // No platform fallback key: if this tenant hasn't configured their own
+    // credential for the agent's provider, the agent silently doesn't reply
+    // — same no-op convention as "no active agent"/"human assigned" above.
+    // Avoids reintroducing a shared-billing/shared-rate-limit key across tenants.
+    const apiKey = await this.aiCredentialsService.getDecrypted(tenantId, agent.model.providerId);
+    if (!apiKey) return;
 
     const triggeringMessage = await this.prisma.client.message.findUnique({ where: { id: messageId } });
     if (!triggeringMessage || triggeringMessage.direction !== 'INBOUND') return;
@@ -139,6 +148,7 @@ export class AiReplyService {
     const allowedActions: ('STORE' | 'BOOKING')[] = [...(canBuy ? (['STORE'] as const) : []), ...(canBook ? (['BOOKING'] as const) : [])];
 
     const completion = await this.openAiAdapter.complete({
+      apiKey,
       model: agent.model.name,
       messages: chatMessages,
       temperature: agent.temperature,

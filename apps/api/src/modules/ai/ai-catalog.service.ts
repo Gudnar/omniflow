@@ -1,39 +1,35 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AiProviderType } from '@omniflow/database';
-
-// A provider "connected" only when its API key env var is actually set —
-// this is the single source of truth the Agent form's model picker and the
-// Providers tab both read, so an unconfigured provider's models are never
-// selectable (see listModels' filter below).
-function isConfigured(type: AiProviderType): boolean {
-  switch (type) {
-    case 'OPENAI':
-      return !!process.env.OPENAI_API_KEY;
-    case 'ANTHROPIC':
-      return !!process.env.ANTHROPIC_API_KEY;
-    case 'GEMINI':
-      return !!process.env.GOOGLE_API_KEY;
-    default:
-      return false;
-  }
-}
 
 @Injectable()
 export class AiCatalogService {
   constructor(private prisma: PrismaService) {}
 
-  async listProviders() {
-    const providers = await this.prisma.client.aiProvider.findMany({ orderBy: { type: 'asc' } });
-    return providers.map((p: any) => ({ ...p, connected: isConfigured(p.type) }));
+  // A provider "connected" only when THIS tenant has configured their own
+  // credential for it (TenantAiCredential) — this is the single source of
+  // truth the Agent form's model picker and the Providers tab both read, so
+  // an unconfigured provider's models are never selectable for this tenant
+  // (see listModels' filter below). No platform-wide fallback key: a tenant
+  // with no credential simply sees the provider as not configured.
+  async listProviders(tenantId: string) {
+    const [providers, credentials] = await Promise.all([
+      this.prisma.client.aiProvider.findMany({ orderBy: { type: 'asc' } }),
+      this.prisma.client.tenantAiCredential.findMany({ where: { tenantId }, select: { providerId: true } }),
+    ]);
+    const connectedIds = new Set(credentials.map((c: any) => c.providerId));
+    return providers.map((p: any) => ({ ...p, connected: connectedIds.has(p.id) }));
   }
 
-  async listModels() {
-    const models = await this.prisma.client.aiModel.findMany({
-      where: { status: 'ACTIVE' },
-      include: { provider: true },
-      orderBy: { name: 'asc' },
-    });
-    return models.filter((m: any) => isConfigured(m.provider.type));
+  async listModels(tenantId: string) {
+    const [models, credentials] = await Promise.all([
+      this.prisma.client.aiModel.findMany({
+        where: { status: 'ACTIVE' },
+        include: { provider: true },
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.client.tenantAiCredential.findMany({ where: { tenantId }, select: { providerId: true } }),
+    ]);
+    const connectedIds = new Set(credentials.map((c: any) => c.providerId));
+    return models.filter((m: any) => connectedIds.has(m.providerId));
   }
 }

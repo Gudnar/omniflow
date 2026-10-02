@@ -8,6 +8,7 @@ describe('AiReplyService', () => {
   let openAiAdapter: any;
   let knowledgeSearchService: any;
   let contactCommerceService: any;
+  let aiCredentialsService: any;
 
   const openAgent = (overrides: any = {}) => ({
     id: 'agent-1',
@@ -17,7 +18,7 @@ describe('AiReplyService', () => {
     goal: null,
     personality: null,
     escalationKeywords: [],
-    model: { name: 'gpt-4o-mini', provider: { type: 'OPENAI' } },
+    model: { name: 'gpt-4o-mini', providerId: 'p-openai', provider: { type: 'OPENAI' } },
     ...overrides,
   });
 
@@ -36,7 +37,16 @@ describe('AiReplyService', () => {
     openAiAdapter = { complete: jest.fn() };
     knowledgeSearchService = { search: jest.fn().mockResolvedValue([]) };
     contactCommerceService = { generateStorefrontLink: jest.fn() };
-    service = new AiReplyService(prisma, tenantContext, messagesService, openAiAdapter, knowledgeSearchService, contactCommerceService);
+    aiCredentialsService = { getDecrypted: jest.fn().mockResolvedValue('sk-test') };
+    service = new AiReplyService(
+      prisma,
+      tenantContext,
+      messagesService,
+      openAiAdapter,
+      knowledgeSearchService,
+      contactCommerceService,
+      aiCredentialsService,
+    );
   });
 
   it('sets tenant context before doing anything else', async () => {
@@ -84,6 +94,17 @@ describe('AiReplyService', () => {
     expect(openAiAdapter.complete).not.toHaveBeenCalled();
   });
 
+  it('no-ops when the tenant has no credential configured for the agent\'s provider (no platform fallback key)', async () => {
+    prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1', assignedToId: null, status: 'OPEN', channel: 'WHATSAPP' });
+    prisma.client.aiAgent.findMany.mockResolvedValue([openAgent()]);
+    aiCredentialsService.getDecrypted.mockResolvedValue(null);
+
+    await service.generateReply('t1', 'conv1', 'msg1');
+
+    expect(aiCredentialsService.getDecrypted).toHaveBeenCalledWith('t1', 'p-openai');
+    expect(openAiAdapter.complete).not.toHaveBeenCalled();
+  });
+
   it('no-ops when the triggering message is not INBOUND', async () => {
     prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1', assignedToId: null, status: 'OPEN', channel: 'WHATSAPP' });
     prisma.client.aiAgent.findMany.mockResolvedValue([openAgent()]);
@@ -122,6 +143,7 @@ describe('AiReplyService', () => {
 
     expect(openAiAdapter.complete).toHaveBeenCalledWith(
       expect.objectContaining({
+        apiKey: 'sk-test',
         model: 'gpt-4o-mini',
         temperature: 0.7,
         maxTokens: 500,

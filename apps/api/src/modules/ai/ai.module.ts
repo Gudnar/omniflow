@@ -10,6 +10,7 @@ import { AiAgentsService } from './ai-agents.service';
 import { AiUsageController } from './ai-usage.controller';
 import { AiUsageService } from './ai-usage.service';
 import { AiReplyService } from './ai-reply.service';
+import { AiCredentialsService } from './ai-credentials.service';
 import { AiTranscriptionService } from './ai-transcription.service';
 import { InternalAiActionsController } from './internal-ai-actions.controller';
 import { OpenAiAdapter } from './providers/openai.adapter';
@@ -24,6 +25,7 @@ import { InternalApiKeyGuard } from '../internal-actions/internal-api-key.guard'
     AiAgentsService,
     AiUsageService,
     AiReplyService,
+    AiCredentialsService,
     AiTranscriptionService,
     OpenAiAdapter,
     TranscriptionAdapter,
