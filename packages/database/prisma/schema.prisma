@@ -2311,6 +2311,7 @@ enum AiProviderType {
   OPENAI
   ANTHROPIC
   GEMINI
+  DEEPSEEK
 }
 
 // Global catalog, NOT tenant-scoped — same rationale as Permission: shared

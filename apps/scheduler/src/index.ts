@@ -1,3 +1,6 @@
+// Must run before any other import touches process.env — see the matching
+// comment in apps/worker/src/index.ts for why this is needed here too.
+import 'dotenv/config';
 import * as cron from 'node-cron';
 import Redis from 'ioredis';
 import { logger } from '@omniflow/utils';

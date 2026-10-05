@@ -1,3 +1,9 @@
+// Must run before any other import touches process.env — unlike apps/api
+// (NestJS's ConfigModule loads .env for it), this is a plain Node script
+// with nothing else reading the .env file, so every env-dependent constant
+// below (and in every processor module it imports) would otherwise silently
+// fall back to its hardcoded default.
+import 'dotenv/config';
 import { Worker } from 'bullmq';
 import Redis from 'ioredis';
 import { logger } from '@omniflow/utils';

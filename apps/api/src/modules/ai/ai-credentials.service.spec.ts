@@ -167,12 +167,74 @@ describe('AiCredentialsService', () => {
       await expect(service.testConnection('t1', 'p-openai')).rejects.toThrow();
     });
 
-    it('reports "not supported yet" for a provider without a real adapter, never a false ok:true', async () => {
+    it('reports ok:true when Anthropic accepts the key', async () => {
       prisma.client.aiProvider.findUnique.mockResolvedValue({ id: 'p-anthropic', type: 'ANTHROPIC' });
+      global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [] }) }) as any;
 
-      const result = await service.testConnection('t1', 'p-anthropic', 'sk-whatever');
+      const result = await service.testConnection('t1', 'p-anthropic', 'sk-ant-valid');
 
-      expect(result.ok).toBe(false);
+      expect(result.ok).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://api.anthropic.com/v1/models',
+        expect.objectContaining({ headers: { 'x-api-key': 'sk-ant-valid', 'anthropic-version': '2023-06-01' } }),
+      );
+    });
+
+    it('reports ok:false without throwing when Anthropic rejects the key', async () => {
+      prisma.client.aiProvider.findUnique.mockResolvedValue({ id: 'p-anthropic', type: 'ANTHROPIC' });
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        json: async () => ({ error: { message: 'invalid x-api-key' } }),
+      }) as any;
+
+      const result = await service.testConnection('t1', 'p-anthropic', 'sk-ant-invalid');
+
+      expect(result).toEqual({ ok: false, message: 'invalid x-api-key' });
+    });
+
+    it('reports ok:true when Gemini accepts the key', async () => {
+      prisma.client.aiProvider.findUnique.mockResolvedValue({ id: 'p-gemini', type: 'GEMINI' });
+      global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ models: [] }) }) as any;
+
+      const result = await service.testConnection('t1', 'p-gemini', 'gem-valid');
+
+      expect(result.ok).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith('https://generativelanguage.googleapis.com/v1beta/models?key=gem-valid');
+    });
+
+    it('reports ok:false without throwing when Gemini rejects the key', async () => {
+      prisma.client.aiProvider.findUnique.mockResolvedValue({ id: 'p-gemini', type: 'GEMINI' });
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        json: async () => ({ error: { message: 'API key not valid' } }),
+      }) as any;
+
+      const result = await service.testConnection('t1', 'p-gemini', 'gem-invalid');
+
+      expect(result).toEqual({ ok: false, message: 'API key not valid' });
+    });
+
+    it('reports ok:true when DeepSeek accepts the key', async () => {
+      prisma.client.aiProvider.findUnique.mockResolvedValue({ id: 'p-deepseek', type: 'DEEPSEEK' });
+      global.fetch = jest.fn().mockResolvedValue({ ok: true, json: async () => ({ data: [] }) }) as any;
+
+      const result = await service.testConnection('t1', 'p-deepseek', 'ds-valid');
+
+      expect(result.ok).toBe(true);
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://api.deepseek.com/models',
+        expect.objectContaining({ headers: { Authorization: 'Bearer ds-valid' } }),
+      );
+    });
+
+    it('reports "not supported yet" for a provider type with no probe branch, never a false ok:true', async () => {
+      prisma.client.aiProvider.findUnique.mockResolvedValue({ id: 'p-future', type: 'SOME_FUTURE_PROVIDER' });
+
+      const result = await service.testConnection('t1', 'p-future', 'sk-whatever');
+
+      expect(result).toEqual({ ok: false, message: 'La prueba de conexión aún no está disponible para este proveedor' });
     });
   });
 });

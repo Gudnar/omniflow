@@ -4,25 +4,65 @@ import { NotFoundError, ValidationError } from '@omniflow/utils';
 import { encryptSecret, decryptSecret } from '@omniflow/utils';
 import { AiProviderType } from '@omniflow/database';
 
-// Real reachability probes per provider — only OPENAI has a working adapter
-// in this phase (see OpenAiAdapter's own doc comment), so every other
-// provider type intentionally reports "not supported yet" rather than a
-// false-positive "ok: true" nothing ever actually verified.
+// Real reachability probe per provider — each hits a lightweight read-only
+// endpoint (listing models, where the provider offers one) with the given
+// key, so "Probar conexión" never reports ok:true for something nothing
+// actually verified. One branch per AiProviderType; a provider added to the
+// catalog without a branch here falls through to the default "not
+// supported yet" message rather than a false positive.
 async function probe(type: AiProviderType, apiKey: string): Promise<{ ok: boolean; message: string }> {
-  if (type !== 'OPENAI') {
-    return { ok: false, message: 'La prueba de conexión aún no está disponible para este proveedor' };
+  switch (type) {
+    case 'OPENAI':
+      return probeOpenAiCompatible('https://api.openai.com/v1/models', apiKey, 'OpenAI');
+    case 'DEEPSEEK':
+      return probeOpenAiCompatible('https://api.deepseek.com/models', apiKey, 'DeepSeek');
+    case 'ANTHROPIC':
+      return probeAnthropic(apiKey);
+    case 'GEMINI':
+      return probeGemini(apiKey);
+    default:
+      return { ok: false, message: 'La prueba de conexión aún no está disponible para este proveedor' };
   }
+}
+
+async function probeOpenAiCompatible(url: string, apiKey: string, label: string): Promise<{ ok: boolean; message: string }> {
   try {
-    const response = await fetch('https://api.openai.com/v1/models', {
-      headers: { Authorization: `Bearer ${apiKey}` },
+    const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+    if (!response.ok) {
+      const body: any = await response.json().catch(() => ({}));
+      return { ok: false, message: body?.error?.message ?? `${label} respondió con un error (${response.status})` };
+    }
+    return { ok: true, message: `Conexión exitosa con ${label}` };
+  } catch (error: any) {
+    return { ok: false, message: `No se pudo contactar a ${label}: ${error.message}` };
+  }
+}
+
+async function probeAnthropic(apiKey: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const response = await fetch('https://api.anthropic.com/v1/models', {
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     });
     if (!response.ok) {
       const body: any = await response.json().catch(() => ({}));
-      return { ok: false, message: body?.error?.message ?? `OpenAI respondió con un error (${response.status})` };
+      return { ok: false, message: body?.error?.message ?? `Anthropic respondió con un error (${response.status})` };
     }
-    return { ok: true, message: 'Conexión exitosa con OpenAI' };
+    return { ok: true, message: 'Conexión exitosa con Anthropic' };
   } catch (error: any) {
-    return { ok: false, message: `No se pudo contactar a OpenAI: ${error.message}` };
+    return { ok: false, message: `No se pudo contactar a Anthropic: ${error.message}` };
+  }
+}
+
+async function probeGemini(apiKey: string): Promise<{ ok: boolean; message: string }> {
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (!response.ok) {
+      const body: any = await response.json().catch(() => ({}));
+      return { ok: false, message: body?.error?.message ?? `Gemini respondió con un error (${response.status})` };
+    }
+    return { ok: true, message: 'Conexión exitosa con Gemini' };
+  } catch (error: any) {
+    return { ok: false, message: `No se pudo contactar a Gemini: ${error.message}` };
   }
 }
 

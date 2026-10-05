@@ -14,6 +14,9 @@ import { AiCredentialsService } from './ai-credentials.service';
 import { AiTranscriptionService } from './ai-transcription.service';
 import { InternalAiActionsController } from './internal-ai-actions.controller';
 import { OpenAiAdapter } from './providers/openai.adapter';
+import { AnthropicAdapter } from './providers/anthropic.adapter';
+import { GeminiAdapter } from './providers/gemini.adapter';
+import { DeepSeekAdapter } from './providers/deepseek.adapter';
 import { TranscriptionAdapter } from './providers/transcription.adapter';
 import { InternalApiKeyGuard } from '../internal-actions/internal-api-key.guard';
 
@@ -28,6 +31,9 @@ import { InternalApiKeyGuard } from '../internal-actions/internal-api-key.guard'
     AiCredentialsService,
     AiTranscriptionService,
     OpenAiAdapter,
+    AnthropicAdapter,
+    GeminiAdapter,
+    DeepSeekAdapter,
     TranscriptionAdapter,
     InternalApiKeyGuard,
   ],

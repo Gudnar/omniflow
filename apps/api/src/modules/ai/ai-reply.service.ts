@@ -1,9 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { logger } from '@omniflow/utils';
+import { AiProviderType } from '@omniflow/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../tenant-context/tenant-context.service';
 import { MessagesService } from '../conversations/messages.service';
-import { OpenAiAdapter, LlmMessage, LlmTool } from './providers/openai.adapter';
+import { OpenAiAdapter } from './providers/openai.adapter';
+import { AnthropicAdapter } from './providers/anthropic.adapter';
+import { GeminiAdapter } from './providers/gemini.adapter';
+import { DeepSeekAdapter } from './providers/deepseek.adapter';
+import { LlmAdapter, LlmMessage, LlmTool } from './providers/llm-adapter.types';
 import { KnowledgeSearchService } from '../knowledge/knowledge-search.service';
 import { ContactCommerceService } from '../commerce/contact-commerce.service';
 import { AiCredentialsService } from './ai-credentials.service';
@@ -66,15 +71,27 @@ function buildSystemPrompt(
 // AI_SPEC.md documents, which remains out of scope.
 @Injectable()
 export class AiReplyService {
+  private readonly adapters: Record<AiProviderType, LlmAdapter>;
+
   constructor(
     private prisma: PrismaService,
     private tenantContext: TenantContextService,
     private messagesService: MessagesService,
-    private openAiAdapter: OpenAiAdapter,
+    openAiAdapter: OpenAiAdapter,
+    anthropicAdapter: AnthropicAdapter,
+    geminiAdapter: GeminiAdapter,
+    deepSeekAdapter: DeepSeekAdapter,
     private knowledgeSearchService: KnowledgeSearchService,
     private contactCommerceService: ContactCommerceService,
     private aiCredentialsService: AiCredentialsService,
-  ) {}
+  ) {
+    this.adapters = {
+      OPENAI: openAiAdapter,
+      ANTHROPIC: anthropicAdapter,
+      GEMINI: geminiAdapter,
+      DEEPSEEK: deepSeekAdapter,
+    };
+  }
 
   async generateReply(tenantId: string, conversationId: string, messageId: string): Promise<void> {
     this.tenantContext.setContext({ tenantId });
@@ -96,8 +113,11 @@ export class AiReplyService {
     if (candidates.length !== 1) return;
     const agent = candidates[0];
 
-    // Only OpenAI has a real adapter in this phase (see OpenAiAdapter).
-    if (agent.model.provider.type !== 'OPENAI') return;
+    // One adapter per AiProviderType (see each provider's own doc comment);
+    // a provider missing from the map (shouldn't happen given the seeded
+    // catalog) means no known way to call it — never guess at a format.
+    const adapter = this.adapters[agent.model.provider.type as AiProviderType];
+    if (!adapter) return;
 
     // No platform fallback key: if this tenant hasn't configured their own
     // credential for the agent's provider, the agent silently doesn't reply
@@ -147,7 +167,7 @@ export class AiReplyService {
     const canBook = storeAvailable && (store!.operationMode === 'BOOKING' || store!.operationMode === 'BOTH');
     const allowedActions: ('STORE' | 'BOOKING')[] = [...(canBuy ? (['STORE'] as const) : []), ...(canBook ? (['BOOKING'] as const) : [])];
 
-    const completion = await this.openAiAdapter.complete({
+    const completion = await adapter.complete({
       apiKey,
       model: agent.model.name,
       messages: chatMessages,

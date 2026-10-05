@@ -6,6 +6,9 @@ describe('AiReplyService', () => {
   let tenantContext: any;
   let messagesService: any;
   let openAiAdapter: any;
+  let anthropicAdapter: any;
+  let geminiAdapter: any;
+  let deepSeekAdapter: any;
   let knowledgeSearchService: any;
   let contactCommerceService: any;
   let aiCredentialsService: any;
@@ -35,6 +38,9 @@ describe('AiReplyService', () => {
     tenantContext = { setContext: jest.fn() };
     messagesService = { create: jest.fn() };
     openAiAdapter = { complete: jest.fn() };
+    anthropicAdapter = { complete: jest.fn() };
+    geminiAdapter = { complete: jest.fn() };
+    deepSeekAdapter = { complete: jest.fn() };
     knowledgeSearchService = { search: jest.fn().mockResolvedValue([]) };
     contactCommerceService = { generateStorefrontLink: jest.fn() };
     aiCredentialsService = { getDecrypted: jest.fn().mockResolvedValue('sk-test') };
@@ -43,6 +49,9 @@ describe('AiReplyService', () => {
       tenantContext,
       messagesService,
       openAiAdapter,
+      anthropicAdapter,
+      geminiAdapter,
+      deepSeekAdapter,
       knowledgeSearchService,
       contactCommerceService,
       aiCredentialsService,
@@ -87,11 +96,37 @@ describe('AiReplyService', () => {
     expect(openAiAdapter.complete).not.toHaveBeenCalled();
   });
 
-  it('no-ops when the matched agent uses a provider other than OpenAI', async () => {
-    prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1', assignedToId: null, status: 'OPEN', channel: 'WHATSAPP' });
-    prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ model: { name: 'claude-sonnet-4-5', provider: { type: 'ANTHROPIC' } } })]);
-    await service.generateReply('t1', 'conv1', 'msg1');
-    expect(openAiAdapter.complete).not.toHaveBeenCalled();
+  describe.each([
+    ['OPENAI', 'openAiAdapter'],
+    ['ANTHROPIC', 'anthropicAdapter'],
+    ['GEMINI', 'geminiAdapter'],
+    ['DEEPSEEK', 'deepSeekAdapter'],
+  ] as const)('provider %s', (providerType, adapterName) => {
+    const adaptersByName: Record<string, () => any> = {
+      openAiAdapter: () => openAiAdapter,
+      anthropicAdapter: () => anthropicAdapter,
+      geminiAdapter: () => geminiAdapter,
+      deepSeekAdapter: () => deepSeekAdapter,
+    };
+
+    it(`dispatches to the ${adapterName} and only that one`, async () => {
+      const matchingAdapter = adaptersByName[adapterName]();
+      const otherAdapters = Object.entries(adaptersByName)
+        .filter(([name]) => name !== adapterName)
+        .map(([, get]) => get());
+
+      prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1', assignedToId: null, status: 'OPEN', channel: 'WHATSAPP' });
+      prisma.client.aiAgent.findMany.mockResolvedValue([
+        openAgent({ model: { name: 'some-model', providerId: 'p-1', provider: { type: providerType } } }),
+      ]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'hola' });
+      matchingAdapter.complete.mockResolvedValue({ content: 'respuesta', promptTokens: 1, completionTokens: 1 });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(matchingAdapter.complete).toHaveBeenCalledTimes(1);
+      otherAdapters.forEach((adapter) => expect(adapter.complete).not.toHaveBeenCalled());
+    });
   });
 
   it('no-ops when the tenant has no credential configured for the agent\'s provider (no platform fallback key)', async () => {

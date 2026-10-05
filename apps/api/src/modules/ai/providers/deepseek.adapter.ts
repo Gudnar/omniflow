@@ -2,16 +2,18 @@ import { Injectable } from '@nestjs/common';
 import { ValidationError } from '@omniflow/utils';
 import { LlmAdapter, LlmCompletionParams, LlmCompletionResult } from './llm-adapter.types';
 
-export * from './llm-adapter.types';
-
+// DeepSeek's API is OpenAI-compatible (same request/response shape,
+// including tool calling) — same pattern as OpenAiAdapter, pointed at
+// DeepSeek's own base URL (https://api.deepseek.com, no "/v1" segment, per
+// their own docs' recommended base_url).
 @Injectable()
-export class OpenAiAdapter implements LlmAdapter {
+export class DeepSeekAdapter implements LlmAdapter {
   async complete(params: LlmCompletionParams): Promise<LlmCompletionResult> {
     if (!params.apiKey) {
-      throw new ValidationError('OpenAI is not configured for this tenant');
+      throw new ValidationError('DeepSeek is not configured for this tenant');
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://api.deepseek.com/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -31,7 +33,7 @@ export class OpenAiAdapter implements LlmAdapter {
 
     if (!response.ok) {
       const text = await response.text().catch(() => '');
-      throw new Error(`OpenAI completion failed: ${response.status} ${text}`);
+      throw new Error(`DeepSeek completion failed: ${response.status} ${text}`);
     }
 
     const data: any = await response.json();

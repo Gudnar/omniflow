@@ -61,11 +61,10 @@ async function main() {
 
   // Global AI provider/model catalog (Phase 13: AI foundation) — shared
   // across every tenant, same "seed once, never tenant-scoped" treatment as
-  // Permission itself. Only OpenAI has a real adapter wired up right now
-  // (see apps/api/src/modules/ai/providers/openai.adapter.ts); Anthropic and
-  // Gemini exist as catalog entries so the Agent form's provider list
-  // matches AI_SPEC.md's documented set, with their models seeded INACTIVE
-  // so they can't be picked until a real adapter exists for them.
+  // Permission itself. All four providers now have a real adapter wired up
+  // (see apps/api/src/modules/ai/providers/*.adapter.ts), so every model
+  // below is ACTIVE — a model only needs to be seeded INACTIVE again if its
+  // provider's adapter is ever removed/broken.
   const providers = [
     {
       type: 'OPENAI' as const,
@@ -79,14 +78,22 @@ async function main() {
       type: 'ANTHROPIC' as const,
       label: 'Anthropic',
       models: [
-        { name: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5', capabilities: ['text', 'vision'], status: 'INACTIVE' as const },
+        { name: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5', capabilities: ['text', 'vision'], status: 'ACTIVE' as const },
       ],
     },
     {
       type: 'GEMINI' as const,
       label: 'Google Gemini',
       models: [
-        { name: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', capabilities: ['text', 'vision'], status: 'INACTIVE' as const },
+        { name: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', capabilities: ['text', 'vision'], status: 'ACTIVE' as const },
+      ],
+    },
+    {
+      type: 'DEEPSEEK' as const,
+      label: 'DeepSeek',
+      models: [
+        { name: 'deepseek-chat', label: 'DeepSeek Chat', capabilities: ['text'], status: 'ACTIVE' as const },
+        { name: 'deepseek-reasoner', label: 'DeepSeek Reasoner', capabilities: ['text'], status: 'ACTIVE' as const },
       ],
     },
   ];
