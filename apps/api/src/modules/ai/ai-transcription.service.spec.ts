@@ -6,18 +6,21 @@ describe('AiTranscriptionService', () => {
   let tenantContext: any;
   let transcriptionAdapter: any;
   let aiReplyService: any;
+  let aiCredentialsService: any;
   const originalFetch = global.fetch;
 
   beforeEach(() => {
     prisma = {
       client: {
         message: { findUnique: jest.fn(), update: jest.fn() },
+        aiProvider: { findUnique: jest.fn().mockResolvedValue({ id: 'p-openai', type: 'OPENAI' }) },
       },
     };
     tenantContext = { setContext: jest.fn() };
     transcriptionAdapter = { transcribe: jest.fn() };
     aiReplyService = { generateReply: jest.fn() };
-    service = new AiTranscriptionService(prisma, tenantContext, transcriptionAdapter, aiReplyService);
+    aiCredentialsService = { getDecrypted: jest.fn().mockResolvedValue('sk-test') };
+    service = new AiTranscriptionService(prisma, tenantContext, transcriptionAdapter, aiReplyService, aiCredentialsService);
   });
 
   afterEach(() => {
@@ -45,6 +48,20 @@ describe('AiTranscriptionService', () => {
   it('no-ops when the AUDIO message has no attachment', async () => {
     prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', type: 'AUDIO', attachments: [] });
     await service.transcribeAndReply('t1', 'msg1');
+    expect(transcriptionAdapter.transcribe).not.toHaveBeenCalled();
+  });
+
+  it('no-ops when the tenant has no OpenAI credential configured (Whisper is OpenAI-only)', async () => {
+    prisma.client.message.findUnique.mockResolvedValue({
+      id: 'msg1',
+      type: 'AUDIO',
+      attachments: [{ url: 'http://x/audio.ogg', fileName: 'audio.ogg', mimeType: 'audio/ogg' }],
+    });
+    aiCredentialsService.getDecrypted.mockResolvedValue(null);
+
+    await service.transcribeAndReply('t1', 'msg1');
+
+    expect(aiCredentialsService.getDecrypted).toHaveBeenCalledWith('t1', 'p-openai');
     expect(transcriptionAdapter.transcribe).not.toHaveBeenCalled();
   });
 
@@ -77,7 +94,7 @@ describe('AiTranscriptionService', () => {
 
     await service.transcribeAndReply('t1', 'msg1');
 
-    expect(transcriptionAdapter.transcribe).toHaveBeenCalledWith(Buffer.from('fake-audio-bytes'), 'audio.ogg', 'audio/ogg');
+    expect(transcriptionAdapter.transcribe).toHaveBeenCalledWith('sk-test', Buffer.from('fake-audio-bytes'), 'audio.ogg', 'audio/ogg');
     expect(prisma.client.message.update).toHaveBeenCalledWith({
       where: { id: 'msg1' },
       data: { content: '¿Tienen delivery?' },

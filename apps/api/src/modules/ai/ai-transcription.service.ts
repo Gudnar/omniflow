@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../tenant-context/tenant-context.service';
 import { TranscriptionAdapter } from './providers/transcription.adapter';
 import { AiReplyService } from './ai-reply.service';
+import { AiCredentialsService } from './ai-credentials.service';
 
 // Phase 26: Voice/audio transcription — invoked from
 // InternalAiActionsController, enqueued by apps/worker off the hot webhook
@@ -19,6 +20,7 @@ export class AiTranscriptionService {
     private tenantContext: TenantContextService,
     private transcriptionAdapter: TranscriptionAdapter,
     private aiReplyService: AiReplyService,
+    private aiCredentialsService: AiCredentialsService,
   ) {}
 
   async transcribeAndReply(tenantId: string, messageId: string): Promise<void> {
@@ -36,6 +38,18 @@ export class AiTranscriptionService {
       return;
     }
 
+    // Whisper is OpenAI-only (no other provider has a transcription
+    // adapter), so this always resolves the tenant's OpenAI credential
+    // specifically — independent of which provider any of the tenant's
+    // agents use for replying. No platform fallback key, same rationale as
+    // AiReplyService: without one, voice notes simply don't get transcribed.
+    const openAiProvider = await this.prisma.client.aiProvider.findUnique({ where: { type: 'OPENAI' } });
+    const apiKey = openAiProvider ? await this.aiCredentialsService.getDecrypted(tenantId, openAiProvider.id) : null;
+    if (!apiKey) {
+      logger.info('Transcription skipped: tenant has no OpenAI credential configured', { tenantId, messageId });
+      return;
+    }
+
     const audioResponse = await fetch(attachment.url);
     if (!audioResponse.ok) {
       logger.error('Transcription skipped: could not download stored audio', undefined, {
@@ -47,7 +61,7 @@ export class AiTranscriptionService {
     }
     const buffer = Buffer.from(await audioResponse.arrayBuffer());
 
-    const transcript = await this.transcriptionAdapter.transcribe(buffer, attachment.fileName, attachment.mimeType);
+    const transcript = await this.transcriptionAdapter.transcribe(apiKey, buffer, attachment.fileName, attachment.mimeType);
 
     await this.prisma.client.message.update({
       where: { id: messageId },

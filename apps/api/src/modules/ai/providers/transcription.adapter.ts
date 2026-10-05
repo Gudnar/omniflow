@@ -6,10 +6,9 @@ import { ValidationError } from '@omniflow/utils';
 // fetch/FormData/Blob (undici) handle this natively, no SDK needed.
 @Injectable()
 export class TranscriptionAdapter {
-  async transcribe(buffer: Buffer, filename: string, mimeType: string): Promise<string> {
-    const apiKey = process.env.OPENAI_API_KEY;
+  async transcribe(apiKey: string, buffer: Buffer, filename: string, mimeType: string): Promise<string> {
     if (!apiKey) {
-      throw new ValidationError('OpenAI is not configured (missing OPENAI_API_KEY)');
+      throw new ValidationError('OpenAI is not configured for this tenant');
     }
 
     const formData = new FormData();
