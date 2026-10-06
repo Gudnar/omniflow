@@ -216,7 +216,7 @@ describe('OrdersService', () => {
       });
       expect(eventsService.emit).toHaveBeenCalledWith(
         'order.confirmed',
-        { orderId: 'o1', orderNumber: 'ORD-TEST', fromStatus: 'PENDING', toStatus: 'CONFIRMED' },
+        { orderId: 'o1', orderNumber: 'ORD-TEST', fromStatus: 'PENDING', toStatus: 'CONFIRMED', productIds: [undefined], productNames: [undefined] },
         'c1',
       );
     });

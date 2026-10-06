@@ -331,9 +331,20 @@ export class OrdersService {
 
     const eventType = STATUS_EVENT[toStatus];
     if (eventType) {
+      // productIds/productNames — see carts.service.ts's order.created emit
+      // for why: lets a Flow target "this order contains product X" without
+      // an engine change (evaluateCondition's 'contains' already handles
+      // array membership).
       await this.eventsService.emit(
         eventType,
-        { orderId: id, orderNumber: order.orderNumber, fromStatus: order.status, toStatus },
+        {
+          orderId: id,
+          orderNumber: order.orderNumber,
+          fromStatus: order.status,
+          toStatus,
+          productIds: order.items.map((item: any) => item.productId),
+          productNames: order.items.map((item: any) => item.productNameSnapshot),
+        },
         order.contactId,
       );
     }

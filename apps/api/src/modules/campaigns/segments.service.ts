@@ -48,6 +48,9 @@ export class SegmentsService {
       ...(filter.status && { status: filter.status }),
       ...(filter.type && { type: filter.type }),
       ...(filter.tagIds?.length && { tags: { some: { tagId: { in: filter.tagIds } } } }),
+      ...(filter.purchasedProductId && {
+        orders: { some: { status: { not: 'CANCELLED' }, items: { some: { productId: filter.purchasedProductId } } } },
+      }),
     };
   }
 

@@ -12,7 +12,7 @@
     "test": "turbo run test",
     "test:watch": "turbo run test:watch",
     "db:migrate": "pnpm --filter database migrate dev",
-    "db:migrate:prod": "pnpm --filter database migrate deploy",
+    "db:migrate:prod": "pnpm --filter database migrate:deploy",
     "db:generate": "pnpm --filter database generate",
     "db:push": "pnpm --filter database db push",
     "db:seed": "pnpm --filter database seed"

@@ -3,7 +3,15 @@
 import { useEffect, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
-import type { FlowNodeType } from '@/lib/types';
+import { useAuth } from '@/lib/auth-context';
+import { apiGet } from '@/lib/api-client';
+import type { FlowNodeType, MessageTemplate } from '@/lib/types';
+
+function countPlaceholders(bodyText: string): number[] {
+  const matches = bodyText.match(/\{\{(\d+)\}\}/g) ?? [];
+  const numbers = Array.from(new Set(matches.map((m) => Number(m.replace(/\D/g, ''))))).sort((a, b) => a - b);
+  return numbers;
+}
 
 export const EVENT_TYPES = [
   'contact.created',
@@ -33,6 +41,7 @@ export const ACTION_SUBTYPES = [
   'UPDATE_APPOINTMENT_STATUS',
   'WEBHOOK_CALL',
   'NOTIFY',
+  'SEND_TEMPLATE',
 ] as const;
 
 const ACTION_LABELS: Record<string, string> = {
@@ -45,6 +54,7 @@ const ACTION_LABELS: Record<string, string> = {
   UPDATE_APPOINTMENT_STATUS: 'Cambiar estado de cita',
   WEBHOOK_CALL: 'Llamar webhook',
   NOTIFY: 'Notificar al equipo',
+  SEND_TEMPLATE: 'Enviar plantilla de WhatsApp',
 };
 
 const ORDER_STATUSES = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'DELIVERED', 'CANCELLED'];
@@ -71,13 +81,22 @@ export function NodeConfigModal({
   onSave: (value: NodeFormValue) => void;
   onDelete: () => void;
 }) {
+  const { tokens } = useAuth();
   const [subtype, setSubtype] = useState(initial.subtype);
   const [config, setConfig] = useState<Record<string, any>>(initial.config ?? {});
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
 
   useEffect(() => {
     setSubtype(initial.subtype);
     setConfig(initial.config ?? {});
   }, [initial]);
+
+  // Only fetched once a SEND_TEMPLATE node is actually opened — every other
+  // node type never needs this, no point loading it up front.
+  useEffect(() => {
+    if (nodeType !== 'ACTION' || !tokens) return;
+    apiGet<MessageTemplate[]>('/templates?status=APPROVED', tokens.accessToken).then(setTemplates).catch(() => setTemplates([]));
+  }, [nodeType, tokens]);
 
   const set = (key: string, value: any) => setConfig((c) => ({ ...c, [key]: value }));
 
@@ -291,6 +310,73 @@ export function NodeConfigModal({
                 <input value={config.url ?? ''} onChange={(e) => set('url', e.target.value)} placeholder="https://..." className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono" />
               </div>
             )}
+
+            {subtype === 'SEND_TEMPLATE' && (() => {
+              const selected = templates.find((t) => t.id === config.templateId);
+              const placeholders = selected ? countPlaceholders(selected.bodyText) : [];
+              const parameters: string[] = config.parameters ?? [];
+              return (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-1.5">Plantilla</label>
+                    <select
+                      value={config.templateId ?? ''}
+                      onChange={(e) => set('templateId', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                    >
+                      <option value="">—</option>
+                      {templates.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name} ({t.language})</option>
+                      ))}
+                    </select>
+                    {templates.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        No hay plantillas aprobadas todavía — crealas y mandalas a revisión desde la pestaña "Plantillas".
+                      </p>
+                    )}
+                  </div>
+                  {selected && (
+                    <>
+                      <p className="text-xs text-gray-500 bg-gray-50 rounded-lg p-2.5 whitespace-pre-wrap">{selected.bodyText}</p>
+                      {placeholders.length > 0 && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-900 mb-1.5">
+                            Variables de la plantilla (en orden, admiten <code className="font-mono">{'{{ruta}}'}</code>)
+                          </label>
+                          <div className="space-y-2">
+                            {placeholders.map((n, i) => (
+                              <input
+                                key={n}
+                                value={parameters[i] ?? ''}
+                                onChange={(e) => {
+                                  const next = [...parameters];
+                                  next[i] = e.target.value;
+                                  set('parameters', next);
+                                }}
+                                placeholder={`{{${n}}} — ej. {{contact.name}} o texto fijo`}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 mb-1.5">ID de contacto (opcional)</label>
+                    <input
+                      value={config.contactId ?? ''}
+                      onChange={(e) => set('contactId', e.target.value)}
+                      placeholder="Por defecto usa el contacto del contexto"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    Abre o reutiliza la conversación de WhatsApp del contacto y manda la plantilla, sin importar si pasaron más de 24h desde su último mensaje.
+                  </p>
+                </>
+              );
+            })()}
 
             {subtype === 'NOTIFY' && (
               <>

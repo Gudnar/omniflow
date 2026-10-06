@@ -319,9 +319,17 @@ export class CartsService {
       return tx.order.findUnique({ where: { id: created.id }, include: { items: true, fulfillment: true } });
     });
 
+    // productIds/productNames — lets a Flow's CONDITION node target "this
+    // order contains product X" (operator: 'contains' on an array already
+    // works via evaluateCondition, no engine change needed) and keeps the
+    // Flow builder's {{event.payload...}} interpolation useful for
+    // product-level follow-up messages, not just order-level ones.
+    const productIds = order.items.map((item: any) => item.productId);
+    const productNames = order.items.map((item: any) => item.productNameSnapshot);
+
     await this.eventsService.emit(
       'order.created',
-      { orderId: order.id, orderNumber: order.orderNumber, total: Number(order.total) },
+      { orderId: order.id, orderNumber: order.orderNumber, total: Number(order.total), productIds, productNames },
       order.contactId,
     );
 
@@ -364,7 +372,7 @@ export class CartsService {
     if (requiresManualApproval) {
       await this.eventsService.emit(
         'order.pending_approval',
-        { orderId: order.id, orderNumber: order.orderNumber, total: Number(order.total) },
+        { orderId: order.id, orderNumber: order.orderNumber, total: Number(order.total), productIds, productNames },
         order.contactId,
       );
       if (tenant?.notifyOnOrderPendingApproval) {

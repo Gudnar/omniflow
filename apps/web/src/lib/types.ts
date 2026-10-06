@@ -753,6 +753,7 @@ export interface SegmentFilter {
   status?: 'ACTIVE' | 'INACTIVE';
   type?: 'LEAD' | 'PROSPECT' | 'CUSTOMER';
   tagIds?: string[];
+  purchasedProductId?: string;
 }
 
 export interface Segment {
@@ -815,6 +816,7 @@ export interface StorefrontProduct {
     description: string | null;
     categoryId: string | null;
     category?: { id: string; name: string } | null;
+    media: { id: string; url: string }[];
   };
   variant: { id: string; name: string | null; sku: string };
 }

@@ -137,6 +137,7 @@ export class StorefrontService {
             requiresPreparation: true,
             preparationReason: true,
             preparationMinutes: true,
+            media: { where: { isPrimary: true }, take: 1, select: { id: true, url: true } },
           },
         },
         variant: { select: { id: true, name: true, sku: true } },

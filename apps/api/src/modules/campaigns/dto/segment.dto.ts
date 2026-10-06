@@ -8,6 +8,10 @@ export class SegmentFilterDto {
   @IsOptional() @IsEnum(ContactStatus) declare status?: ContactStatus;
   @IsOptional() @IsEnum(ContactType) declare type?: ContactType;
   @IsOptional() @IsArray() @IsString({ each: true }) declare tagIds?: string[];
+  // Contacts with at least one non-cancelled Order containing this product —
+  // the "bought X" targeting criterion for post-purchase follow-up/offer
+  // campaigns.
+  @IsOptional() @IsString() declare purchasedProductId?: string;
 }
 
 export class CreateSegmentDto {

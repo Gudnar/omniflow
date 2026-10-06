@@ -506,7 +506,12 @@ export default function StorefrontPage() {
                     className="w-20 h-20 rounded-xl flex-shrink-0 flex items-center justify-center text-[10px] text-gray-400 overflow-hidden"
                     style={{ backgroundColor: tint(settings.buttonColor, 12) }}
                   >
-                    Sin imagen
+                    {p.product.media[0]?.url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.product.media[0].url} alt={p.product.name} className="w-full h-full object-cover" />
+                    ) : (
+                      'Sin imagen'
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate">{p.product.name}</p>

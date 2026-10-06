@@ -43,6 +43,18 @@ describe('SegmentsService', () => {
       expect(ids).toEqual(['c1', 'c2']);
     });
 
+    it('filters by purchasedProductId via a non-cancelled order containing that product', async () => {
+      prisma.client.segment.findUnique.mockResolvedValue({ id: 's1', filterQuery: { purchasedProductId: 'p1' } });
+      prisma.client.contact.findMany.mockResolvedValue([{ id: 'c1' }]);
+
+      await service.resolveContactIds('s1');
+
+      expect(prisma.client.contact.findMany).toHaveBeenCalledWith({
+        where: { orders: { some: { status: { not: 'CANCELLED' }, items: { some: { productId: 'p1' } } } } },
+        select: { id: true },
+      });
+    });
+
     it('omits absent filter fields entirely rather than passing them as undefined', async () => {
       prisma.client.segment.findUnique.mockResolvedValue({ id: 's1', filterQuery: {} });
       prisma.client.contact.findMany.mockResolvedValue([]);

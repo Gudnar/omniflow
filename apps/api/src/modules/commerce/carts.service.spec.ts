@@ -278,7 +278,7 @@ describe('CartsService', () => {
       expect(result.id).toBe('order-1');
       expect(eventsService.emit).toHaveBeenCalledWith(
         'order.created',
-        { orderId: 'order-1', orderNumber: 'ORD-1', total: 50 },
+        { orderId: 'order-1', orderNumber: 'ORD-1', total: 50, productIds: [], productNames: [] },
         'c1',
       );
     });
@@ -407,7 +407,7 @@ describe('CartsService', () => {
       );
       expect(eventsService.emit).toHaveBeenCalledWith(
         'order.pending_approval',
-        { orderId: 'order-1', orderNumber: 'ORD-1', total: 50 },
+        { orderId: 'order-1', orderNumber: 'ORD-1', total: 50, productIds: [], productNames: [] },
         'c1',
       );
       expect(notificationsService.create).toHaveBeenCalledWith(

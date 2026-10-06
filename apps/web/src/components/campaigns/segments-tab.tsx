@@ -5,16 +5,24 @@ import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api-client';
-import type { Segment, ContactStatus, ContactType, Tag } from '@/lib/types';
+import type { Segment, ContactStatus, ContactType, Tag, Product } from '@/lib/types';
 import { Modal } from '@/components/ui/modal';
 
-const EMPTY_FORM = { name: '', description: '', status: '' as ContactStatus | '', type: '' as ContactType | '', tagIds: [] as string[] };
+const EMPTY_FORM = {
+  name: '',
+  description: '',
+  status: '' as ContactStatus | '',
+  type: '' as ContactType | '',
+  tagIds: [] as string[],
+  purchasedProductId: '',
+};
 
 export function SegmentsTab() {
   const { tokens } = useAuth();
   const toast = useToast();
   const [segments, setSegments] = useState<Segment[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -25,7 +33,11 @@ export function SegmentsTab() {
 
   useEffect(() => {
     if (!tokens) return;
-    Promise.all([refetch(), apiGet<Tag[]>('/tags', tokens.accessToken).then(setTags)])
+    Promise.all([
+      refetch(),
+      apiGet<Tag[]>('/tags', tokens.accessToken).then(setTags),
+      apiGet<Product[]>('/products', tokens.accessToken).then(setProducts),
+    ])
       .catch((err) => console.error('Error fetching segments:', err))
       .finally(() => setLoading(false));
   }, [tokens]);
@@ -53,6 +65,7 @@ export function SegmentsTab() {
       status: s.filterQuery.status ?? '',
       type: s.filterQuery.type ?? '',
       tagIds: s.filterQuery.tagIds ?? [],
+      purchasedProductId: s.filterQuery.purchasedProductId ?? '',
     });
     setShowModal(true);
   };
@@ -71,6 +84,7 @@ export function SegmentsTab() {
       ...(form.status && { status: form.status }),
       ...(form.type && { type: form.type }),
       ...(form.tagIds.length && { tagIds: form.tagIds }),
+      ...(form.purchasedProductId && { purchasedProductId: form.purchasedProductId }),
     },
   });
 
@@ -140,6 +154,8 @@ export function SegmentsTab() {
                     s.filterQuery.status && `Estado: ${s.filterQuery.status}`,
                     s.filterQuery.type && `Tipo: ${s.filterQuery.type}`,
                     s.filterQuery.tagIds?.length && `${s.filterQuery.tagIds.length} etiqueta(s)`,
+                    s.filterQuery.purchasedProductId &&
+                      `Compró: ${products.find((p) => p.id === s.filterQuery.purchasedProductId)?.name ?? '—'}`,
                   ]
                     .filter(Boolean)
                     .join(' · ') || 'Todos los contactos'}
@@ -196,6 +212,23 @@ export function SegmentsTab() {
                 <option value="CUSTOMER">Cliente</option>
               </select>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1.5">Compró este producto</label>
+            <select
+              value={form.purchasedProductId}
+              onChange={(e) => setForm({ ...form, purchasedProductId: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+            >
+              <option value="">Cualquiera / no filtrar</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+            <p className="text-xs text-gray-400 mt-1">
+              Contactos con al menos un pedido (no cancelado) que incluya este producto — ideal para seguimiento y
+              ofertas de recompra.
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-900 mb-1.5">Etiquetas</label>

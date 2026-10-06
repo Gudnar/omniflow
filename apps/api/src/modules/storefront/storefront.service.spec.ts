@@ -140,6 +140,21 @@ describe('StorefrontService', () => {
       expect(result[0].price).toBe(10);
     });
 
+    it("selects each product's primary image so the storefront grid can render a thumbnail", async () => {
+      prisma.raw.ecommerceStore.findUnique.mockResolvedValue({ id: 's1', tenantId: 't1', status: 'PUBLISHED' });
+      prisma.client.ecommerceStoreBranch.findFirst.mockResolvedValue({ branchId: 'b1' });
+      prisma.client.branchProduct.findMany.mockResolvedValue([]);
+
+      await service.listProducts('demo');
+
+      const [[call]] = prisma.client.branchProduct.findMany.mock.calls;
+      expect(call.include.product.select.media).toEqual({
+        where: { isPrimary: true },
+        take: 1,
+        select: { id: true, url: true },
+      });
+    });
+
     it('uses the requested branchId when it is actually linked to this store', async () => {
       prisma.raw.ecommerceStore.findUnique.mockResolvedValue({ id: 's1', tenantId: 't1', status: 'PUBLISHED' });
       prisma.client.ecommerceStoreBranch.findUnique.mockResolvedValue({ storeId: 's1', branchId: 'b2' });

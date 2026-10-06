@@ -51,6 +51,7 @@ function summarize(type: FlowNodeType, subtype: string, config: Record<string, a
       case 'UPDATE_ORDER_STATUS': return config.status ? `pedido → ${config.status}` : 'pedido';
       case 'UPDATE_APPOINTMENT_STATUS': return config.status ? `cita → ${config.status}` : 'cita';
       case 'WEBHOOK_CALL': return config.url || 'webhook';
+      case 'SEND_TEMPLATE': return config.templateId ? 'plantilla de WhatsApp' : 'sin plantilla';
       default: return subtype;
     }
   }
