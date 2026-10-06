@@ -68,6 +68,7 @@ export class BookingStorefrontService {
     });
     return {
       minBookingLeadDays: branch.minBookingLeadDays,
+      timezone: branch.timezone,
       dates: rows.map((r: any) => r.date.toISOString().slice(0, 10)),
     };
   }

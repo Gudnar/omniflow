@@ -11,6 +11,20 @@ import { StorefrontInfoSheet } from '../info-sheet';
 
 type View = 'services' | 'calendar' | 'slots' | 'confirm' | 'success';
 
+type BookingConfig = { minBookingLeadDays: number; timezone: string; dates: string[] };
+
+// `slot.startAt`/`appointment.startAt` are real UTC instants — must be
+// formatted in the BRANCH's timezone (not the raw UTC digits, and not the
+// visitor's own device timezone) to show the time the customer actually
+// picked. See appointments.service.ts for the matching backend conversion.
+function formatSlotTime(iso: string, timeZone: string): string {
+  return new Date(iso).toLocaleTimeString('es-BO', { timeZone, hour: '2-digit', minute: '2-digit', hour12: false });
+}
+
+function formatSlotDate(iso: string, timeZone: string, dateStyle: 'long' | 'full' = 'long'): string {
+  return new Date(iso).toLocaleDateString('es-BO', { timeZone, dateStyle });
+}
+
 export default function BookingStorefrontPage() {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -30,7 +44,7 @@ export default function BookingStorefrontPage() {
 
   const [services, setServices] = useState<StorefrontBookingService[] | null>(null);
   const [selectedService, setSelectedService] = useState<StorefrontBookingService | null>(null);
-  const [bookingConfig, setBookingConfig] = useState<{ minBookingLeadDays: number; dates: string[] } | null>(null);
+  const [bookingConfig, setBookingConfig] = useState<BookingConfig | null>(null);
   const [calendarMonth, setCalendarMonth] = useState(() => {
     const now = new Date();
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
@@ -75,9 +89,7 @@ export default function BookingStorefrontPage() {
     setView('calendar');
     if (!bookingConfig) {
       try {
-        const config = await apiGet<{ minBookingLeadDays: number; dates: string[] }>(
-          `/storefront/sessions/${token}/booking/blackout-dates`,
-        );
+        const config = await apiGet<BookingConfig>(`/storefront/sessions/${token}/booking/blackout-dates`);
         setBookingConfig(config);
       } catch (err: any) {
         toast.error(err.message ?? 'No se pudo cargar la disponibilidad');
@@ -310,7 +322,7 @@ export default function BookingStorefrontPage() {
                     style={{ borderColor: tint(settings.buttonColor, 25), color: settings.buttonColor }}
                   >
                     <Clock className="w-3.5 h-3.5" />
-                    {new Date(slot.startAt).toISOString().slice(11, 16)}
+                    {formatSlotTime(slot.startAt, bookingConfig!.timezone)}
                   </button>
                 ))}
               </div>
@@ -334,12 +346,12 @@ export default function BookingStorefrontPage() {
             <div className="flex justify-between items-center py-3">
               <span className="text-sm text-gray-400">Fecha</span>
               <span className="font-bold text-sm text-right">
-                {new Date(selectedSlot.startAt).toLocaleDateString('es-BO', { timeZone: 'UTC', dateStyle: 'long' })}
+                {formatSlotDate(selectedSlot.startAt, bookingConfig!.timezone)}
               </span>
             </div>
             <div className="flex justify-between items-center py-3">
               <span className="text-sm text-gray-400">Hora</span>
-              <span className="font-bold text-sm">{new Date(selectedSlot.startAt).toISOString().slice(11, 16)}</span>
+              <span className="font-bold text-sm">{formatSlotTime(selectedSlot.startAt, bookingConfig!.timezone)}</span>
             </div>
             <div className="flex justify-between items-center pt-3">
               <span className="font-extrabold text-base">Total</span>
@@ -366,8 +378,8 @@ export default function BookingStorefrontPage() {
             </div>
             <h2 className="font-extrabold text-xl mb-1 tracking-tight">¡Reserva confirmada!</h2>
             <p className="text-sm text-gray-400 mb-6 capitalize">
-              {new Date(completedAppointment.startAt).toLocaleDateString('es-BO', { timeZone: 'UTC', dateStyle: 'long' })} ·{' '}
-              {new Date(completedAppointment.startAt).toISOString().slice(11, 16)}
+              {formatSlotDate(completedAppointment.startAt, bookingConfig!.timezone)} ·{' '}
+              {formatSlotTime(completedAppointment.startAt, bookingConfig!.timezone)}
             </p>
             {session?.returnConversationUrl ? (
               <a
@@ -407,7 +419,7 @@ function BookingCalendarView({
   onBack,
 }: {
   service: StorefrontBookingService;
-  bookingConfig: { minBookingLeadDays: number; dates: string[] } | null;
+  bookingConfig: BookingConfig | null;
   calendarMonth: Date;
   setCalendarMonth: (updater: (d: Date) => Date) => void;
   onSelectDate: (dateStr: string) => void;

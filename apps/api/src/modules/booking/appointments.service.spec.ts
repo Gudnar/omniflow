@@ -52,6 +52,7 @@ describe('AppointmentsService', () => {
     const bookingBlackoutDate = { findUnique: jest.fn().mockResolvedValue(null) };
     const appointmentResourceFindMany = jest.fn().mockResolvedValue([]);
     const bookingResource = { findMany: jest.fn(), findUnique: jest.fn() };
+    const branch = { findUnique: jest.fn().mockResolvedValue({ timezone: 'UTC' }) };
 
     // create()'s in-transaction re-check calls these same read-only tables
     // again through `tx` — sharing the mock functions with the outer
@@ -79,6 +80,7 @@ describe('AppointmentsService', () => {
         userSchedule,
         userTimeOff,
         bookingBlackoutDate,
+        branch,
         appointmentResource: { findMany: appointmentResourceFindMany },
         tenant: {
           findUnique: jest
@@ -163,6 +165,22 @@ describe('AppointmentsService', () => {
 
       const slots = await service.getAvailability({ serviceId: 's1', branchId: 'b1', date: '2026-01-05' } as any);
       expect(slots).toEqual([]);
+    });
+
+    it('converts a schedule entered as branch-local wall-clock minutes into the correct UTC instant', async () => {
+      // America/La_Paz is a fixed UTC-4, no DST — a 10:30 local slot must be
+      // returned as 14:30Z, not 10:30Z (the bug this test guards against).
+      prisma.client.branch.findUnique.mockResolvedValue({ timezone: 'America/La_Paz' });
+      prisma.client.bookingService.findUnique.mockResolvedValue({ id: 's1', durationMinutes: 60 });
+      prisma.client.bookingResource.findMany.mockResolvedValue([{ id: 'r1', type: 'ROOM', userId: null }]);
+      prisma.client.bookingResourceSchedule.findMany.mockResolvedValue([{ startMinute: 630, endMinute: 690 }]);
+      prisma.client.appointmentResource.findMany.mockResolvedValue([]);
+
+      const slots = await service.getAvailability({ serviceId: 's1', branchId: 'b1', date: '2026-01-05' } as any);
+
+      expect(slots).toEqual([
+        { startAt: '2026-01-05T14:30:00.000Z', endAt: '2026-01-05T15:30:00.000Z', resourceIds: ['r1'] },
+      ]);
     });
   });
 

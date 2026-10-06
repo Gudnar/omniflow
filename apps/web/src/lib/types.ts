@@ -621,7 +621,7 @@ export interface Appointment {
   confirmedAt: string | null;
   createdAt: string;
   contact: { id: string; name: string };
-  branch: { id: string; name: string };
+  branch: { id: string; name: string; timezone: string };
   address: CustomerAddress | null;
   services: AppointmentServiceEntry[];
   resources: AppointmentResourceEntry[];

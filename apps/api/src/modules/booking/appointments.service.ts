@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotFoundError, ValidationError } from '@omniflow/utils';
+import { NotFoundError, ValidationError, zonedDateTimeToUtc, utcToZonedDateTime } from '@omniflow/utils';
 import { EventsService } from '../events/events.service';
 import { TenantContextService } from '../tenant-context/tenant-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -23,10 +23,12 @@ const APPOINTMENT_STATUS_EVENT: Record<string, string> = {
   NO_SHOW: 'appointment.no_show',
 };
 
-// Interval math + availability computation intentionally operate in UTC
-// minutes-of-day rather than each tenant's own timezone — a stated
-// simplification for this first pass (UserSchedule.timezone is stored but
-// not yet applied to slot computation).
+// Interval math operates in minutes-of-day relative to the resource's
+// BRANCH timezone (Branch.timezone) — converted to/from real UTC instants
+// via zonedDateTimeToUtc/utcToZonedDateTime at the edges (slot generation,
+// segment validation). UserSchedule has its own `timezone` field that is
+// still not applied (staff personal schedules are assumed to share their
+// branch's zone) — a narrower, still-open simplification than before.
 type Interval = [number, number];
 
 export function intersectIntervals(a: Interval[], b: Interval[]): Interval[] {
@@ -72,7 +74,7 @@ export function sliceIntoSlots(windows: Interval[], durationMinutes: number): In
 
 const APPOINTMENT_INCLUDE = {
   contact: { select: { id: true, name: true } },
-  branch: { select: { id: true, name: true } },
+  branch: { select: { id: true, name: true, timezone: true } },
   address: true,
   services: true,
   resources: { include: { resource: { select: { id: true, name: true, type: true } } } },
@@ -150,17 +152,24 @@ export class AppointmentsService {
   private async getResourceWindowsForDate(
     resource: any,
     dateStr: string,
+    timeZone: string,
     excludeAppointmentId?: string,
     client: any = this.prisma.client,
   ): Promise<Interval[]> {
-    const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
-    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
-    const dayOfWeek = dayStart.getUTCDay();
+    // The calendar date itself (for the dayOfWeek lookup and the
+    // BookingBlackoutDate key, a plain DATE column keyed by that literal
+    // date, not a timezone-shifted instant) vs. the actual UTC instants
+    // bounding that calendar day IN THE BRANCH'S ZONE (for comparing
+    // against real timestamptz columns like Appointment.startAt).
+    const calendarDay = new Date(`${dateStr}T00:00:00.000Z`);
+    const dayOfWeek = calendarDay.getUTCDay();
+    const localDayStart = zonedDateTimeToUtc(dateStr, 0, timeZone);
+    const localDayEnd = zonedDateTimeToUtc(dateStr, 1440, timeZone);
 
     // A whole-team blackout (holiday/closure) for the resource's branch
     // blocks the entire day, regardless of resource type.
     const blackout = await client.bookingBlackoutDate.findUnique({
-      where: { branchId_date: { branchId: resource.branchId, date: dayStart } },
+      where: { branchId_date: { branchId: resource.branchId, date: calendarDay } },
     });
     if (blackout) return [];
 
@@ -178,11 +187,11 @@ export class AppointmentsService {
       windows = intersectIntervals(windows, userWindows);
 
       const timeOff = await client.userTimeOff.findMany({
-        where: { userId: resource.userId, startAt: { lt: dayEnd }, endAt: { gt: dayStart } },
+        where: { userId: resource.userId, startAt: { lt: localDayEnd }, endAt: { gt: localDayStart } },
       });
       const timeOffMinutes: Interval[] = timeOff.map((t: any) => {
-        const start = Math.max(0, Math.floor((t.startAt.getTime() - dayStart.getTime()) / 60000));
-        const end = Math.min(1440, Math.ceil((t.endAt.getTime() - dayStart.getTime()) / 60000));
+        const start = Math.max(0, Math.floor((t.startAt.getTime() - localDayStart.getTime()) / 60000));
+        const end = Math.min(1440, Math.ceil((t.endAt.getTime() - localDayStart.getTime()) / 60000));
         return [start, end] as Interval;
       });
       windows = subtractIntervals(windows, timeOffMinutes);
@@ -193,16 +202,16 @@ export class AppointmentsService {
         resourceId: resource.id,
         appointment: {
           status: { in: ACTIVE_STATUSES },
-          startAt: { lt: dayEnd },
-          endAt: { gt: dayStart },
+          startAt: { lt: localDayEnd },
+          endAt: { gt: localDayStart },
           ...(excludeAppointmentId && { id: { not: excludeAppointmentId } }),
         },
       },
       include: { appointment: true },
     });
     const bookedMinutes: Interval[] = existingAppointmentLinks.map((link: any) => {
-      const start = Math.max(0, Math.floor((link.appointment.startAt.getTime() - dayStart.getTime()) / 60000));
-      const end = Math.min(1440, Math.ceil((link.appointment.endAt.getTime() - dayStart.getTime()) / 60000));
+      const start = Math.max(0, Math.floor((link.appointment.startAt.getTime() - localDayStart.getTime()) / 60000));
+      const end = Math.min(1440, Math.ceil((link.appointment.endAt.getTime() - localDayStart.getTime()) / 60000));
       return [start, end] as Interval;
     });
 
@@ -213,15 +222,18 @@ export class AppointmentsService {
     const service = await this.prisma.client.bookingService.findUnique({ where: { id: query.serviceId } });
     if (!service) throw new NotFoundError('BookingService');
 
+    const branch = await this.prisma.client.branch.findUnique({ where: { id: query.branchId }, select: { timezone: true } });
+    if (!branch) throw new NotFoundError('Branch');
+    const timeZone = branch.timezone;
+
     const resources = await this.prisma.client.bookingResource.findMany({
       where: { branchId: query.branchId, status: 'ACTIVE', services: { some: { serviceId: query.serviceId } } },
     });
 
-    const dayStart = new Date(`${query.date}T00:00:00.000Z`);
     const slotMap = new Map<number, Set<string>>();
 
     for (const resource of resources) {
-      const windows = await this.getResourceWindowsForDate(resource, query.date);
+      const windows = await this.getResourceWindowsForDate(resource, query.date, timeZone);
       const slots = sliceIntoSlots(windows, service.durationMinutes);
       for (const [start] of slots) {
         if (!slotMap.has(start)) slotMap.set(start, new Set());
@@ -232,7 +244,7 @@ export class AppointmentsService {
     return Array.from(slotMap.entries())
       .sort(([a], [b]) => a - b)
       .map(([startMinute, resourceIds]) => {
-        const startAt = new Date(dayStart.getTime() + startMinute * 60000);
+        const startAt = zonedDateTimeToUtc(query.date, startMinute, timeZone);
         const endAt = new Date(startAt.getTime() + service.durationMinutes * 60000);
         return { startAt: startAt.toISOString(), endAt: endAt.toISOString(), resourceIds: Array.from(resourceIds) };
       });
@@ -252,6 +264,10 @@ export class AppointmentsService {
       throw new ValidationError('resourceIds must have the same length as serviceIds when provided');
     }
 
+    const branch = await this.prisma.client.branch.findUnique({ where: { id: dto.branchId }, select: { timezone: true } });
+    if (!branch) throw new ValidationError('Branch not found');
+    const timeZone = branch.timezone;
+
     let cursor = new Date(dto.startAt);
     const segments: { service: any; resourceId?: string; startAt: Date; endAt: Date }[] = [];
     for (let i = 0; i < dto.serviceIds.length; i++) {
@@ -263,10 +279,8 @@ export class AppointmentsService {
     }
 
     for (const segment of segments) {
-      const dateStr = segment.startAt.toISOString().slice(0, 10);
-      const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
-      const segStartMinute = Math.round((segment.startAt.getTime() - dayStart.getTime()) / 60000);
-      const segEndMinute = Math.round((segment.endAt.getTime() - dayStart.getTime()) / 60000);
+      const { dateStr, minutes: segStartMinute } = utcToZonedDateTime(segment.startAt, timeZone);
+      const segEndMinute = segStartMinute + Math.round((segment.endAt.getTime() - segment.startAt.getTime()) / 60000);
 
       const candidateResources = segment.resourceId
         ? await this.prisma.client.bookingResource.findMany({
@@ -278,7 +292,7 @@ export class AppointmentsService {
 
       let assigned: any = null;
       for (const candidate of candidateResources) {
-        const windows = await this.getResourceWindowsForDate(candidate, dateStr);
+        const windows = await this.getResourceWindowsForDate(candidate, dateStr, timeZone);
         const fits = windows.some(([s, e]) => s <= segStartMinute && e >= segEndMinute);
         if (fits) {
           assigned = candidate;
@@ -311,12 +325,10 @@ export class AppointmentsService {
       // check and this write. Public, anonymous traffic makes this a real
       // risk, not just a theoretical one.
       for (const segment of segments) {
-        const dateStr = segment.startAt.toISOString().slice(0, 10);
-        const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
-        const segStartMinute = Math.round((segment.startAt.getTime() - dayStart.getTime()) / 60000);
-        const segEndMinute = Math.round((segment.endAt.getTime() - dayStart.getTime()) / 60000);
+        const { dateStr, minutes: segStartMinute } = utcToZonedDateTime(segment.startAt, timeZone);
+        const segEndMinute = segStartMinute + Math.round((segment.endAt.getTime() - segment.startAt.getTime()) / 60000);
         const resource = await tx.bookingResource.findUnique({ where: { id: segment.resourceId } });
-        const windows = await this.getResourceWindowsForDate(resource, dateStr, undefined, tx);
+        const windows = await this.getResourceWindowsForDate(resource, dateStr, timeZone, undefined, tx);
         const stillFits = windows.some(([s, e]) => s <= segStartMinute && e >= segEndMinute);
         if (!stillFits) {
           throw new ValidationError(`Ese horario ya no está disponible para "${segment.service.name}", elige otro.`);
@@ -373,7 +385,7 @@ export class AppointmentsService {
         await this.notificationsService.create({
           type: 'appointment.pending_approval',
           title: 'Nueva cita pendiente de aprobación',
-          body: new Date(appointment.startAt).toLocaleString(),
+          body: new Date(appointment.startAt).toLocaleString('es-BO', { timeZone, dateStyle: 'medium', timeStyle: 'short' }),
           link: '/dashboard/booking',
         });
       }
@@ -392,15 +404,15 @@ export class AppointmentsService {
     const newEndAt = dto.endAt ? new Date(dto.endAt) : new Date(appointment.endAt);
     const resourceIds: string[] = dto.resourceIds ?? appointment.resources.map((r: any) => r.resourceId);
 
-    const dateStr = newStartAt.toISOString().slice(0, 10);
-    const dayStart = new Date(`${dateStr}T00:00:00.000Z`);
-    const startMinute = Math.round((newStartAt.getTime() - dayStart.getTime()) / 60000);
-    const endMinute = Math.round((newEndAt.getTime() - dayStart.getTime()) / 60000);
+    const branch = await this.prisma.client.branch.findUnique({ where: { id: appointment.branchId }, select: { timezone: true } });
+    const timeZone = branch?.timezone ?? 'UTC';
+    const { dateStr, minutes: startMinute } = utcToZonedDateTime(newStartAt, timeZone);
+    const endMinute = startMinute + Math.round((newEndAt.getTime() - newStartAt.getTime()) / 60000);
 
     for (const resourceId of resourceIds) {
       const resource = await this.prisma.client.bookingResource.findUnique({ where: { id: resourceId } });
       if (!resource) throw new NotFoundError('BookingResource');
-      const windows = await this.getResourceWindowsForDate(resource, dateStr, id);
+      const windows = await this.getResourceWindowsForDate(resource, dateStr, timeZone, id);
       const fits = windows.some(([s, e]) => s <= startMinute && e >= endMinute);
       if (!fits) throw new ValidationError('The selected resource is not available for the new time');
     }

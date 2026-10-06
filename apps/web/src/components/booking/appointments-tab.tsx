@@ -9,6 +9,7 @@ import type { Appointment, AppointmentStatus, BookingService, AvailabilitySlot }
 import { Modal } from '@/components/ui/modal';
 import { AppointmentDetailPanel } from './appointment-detail-panel';
 import { CalendarView } from './calendar-view';
+import { formatZonedDateTime, formatZonedTime } from './timezone';
 
 const STATUS_LABELS: Record<AppointmentStatus, string> = {
   PENDING: 'Pendiente',
@@ -41,6 +42,7 @@ type ViewMode = 'list' | 'week' | 'day';
 interface Branch {
   id: string;
   name: string;
+  timezone: string;
 }
 interface ContactOption {
   id: string;
@@ -229,7 +231,7 @@ export function AppointmentsTab() {
                   <td className="px-4 py-3 font-medium text-gray-900">{a.contact.name}</td>
                   <td className="px-3 py-3 text-gray-600">{a.services.map((s) => s.serviceNameSnapshot).join(', ')}</td>
                   <td className="px-3 py-3 text-gray-600">{a.branch.name}</td>
-                  <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{new Date(a.startAt).toLocaleString()}</td>
+                  <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{formatZonedDateTime(a.startAt, a.branch.timezone)}</td>
                   <td className="px-3 py-3 font-medium text-gray-900">{a.currency} {a.total.toFixed(2)}</td>
                   <td className="px-3 py-3">
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[a.status]}`}>
@@ -313,7 +315,7 @@ export function AppointmentsTab() {
                     onClick={() => bookSlot(slot)}
                     className="px-2 py-2 border border-gray-200 rounded-lg text-xs font-medium text-gray-700 hover:border-blue-500 hover:bg-blue-50"
                   >
-                    {new Date(slot.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatZonedTime(slot.startAt, branches.find((b) => b.id === form.branchId)?.timezone ?? 'UTC')}
                   </button>
                 ))}
                 {slots.length === 0 && <p className="col-span-3 text-xs text-gray-400 text-center py-4">Sin horarios disponibles ese día.</p>}

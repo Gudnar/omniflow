@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Appointment, AppointmentStatus } from '@/lib/types';
+import { zonedDateParts } from './timezone';
 
 // Fixed business-hours window — simpler and predictable than recomputing the
 // axis from whatever appointments happen to be loaded; an appointment
@@ -53,6 +54,19 @@ function minutesSinceMidnight(d: Date): number {
   return d.getHours() * 60 + d.getMinutes();
 }
 
+// Buckets/positions an appointment by its OWN branch's local calendar day
+// and time, not the viewer's browser timezone — `gridDate` itself is just
+// navigation state (which day/week the admin is looking at), unaffected.
+function isSameZonedDay(iso: string, timeZone: string, gridDate: Date): boolean {
+  const p = zonedDateParts(iso, timeZone);
+  return p.year === gridDate.getFullYear() && p.month === gridDate.getMonth() + 1 && p.day === gridDate.getDate();
+}
+
+function zonedMinutesSinceMidnight(iso: string, timeZone: string): number {
+  const p = zonedDateParts(iso, timeZone);
+  return p.hour * 60 + p.minute;
+}
+
 interface Positioned {
   appointment: Appointment;
   top: number;
@@ -70,8 +84,8 @@ function layoutDay(appointments: Appointment[]): Positioned[] {
 
   const items = appointments
     .map((a) => {
-      const start = Math.max(clampedMin, minutesSinceMidnight(new Date(a.startAt)));
-      const end = Math.min(clampedMax, Math.max(start + 15, minutesSinceMidnight(new Date(a.endAt))));
+      const start = Math.max(clampedMin, zonedMinutesSinceMidnight(a.startAt, a.branch.timezone));
+      const end = Math.min(clampedMax, Math.max(start + 15, zonedMinutesSinceMidnight(a.endAt, a.branch.timezone)));
       return { appointment: a, start, end };
     })
     .sort((a, b) => a.start - b.start);
@@ -103,7 +117,7 @@ function AppointmentBlock({ item, onSelect }: { item: Positioned; onSelect: (id:
   const { appointment: a } = item;
   const widthPct = 100 / item.laneCount;
   const leftPct = item.lane * widthPct;
-  const time = new Date(a.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const time = new Date(a.startAt).toLocaleTimeString('es-BO', { timeZone: a.branch.timezone, hour: '2-digit', minute: '2-digit', hour12: false });
   const resourceName = a.resources[0]?.resource.name;
 
   return (
@@ -153,7 +167,7 @@ function DayColumn({
   onSelect: (id: string) => void;
   isToday: boolean;
 }) {
-  const dayAppointments = appointments.filter((a) => isSameDay(new Date(a.startAt), date));
+  const dayAppointments = appointments.filter((a) => isSameZonedDay(a.startAt, a.branch.timezone, date));
   const positioned = useMemo(() => layoutDay(dayAppointments), [dayAppointments]);
   const hours = Array.from({ length: HOUR_END - HOUR_START }, (_, i) => HOUR_START + i);
 

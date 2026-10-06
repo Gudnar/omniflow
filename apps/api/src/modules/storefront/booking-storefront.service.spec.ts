@@ -13,7 +13,7 @@ describe('BookingStorefrontService', () => {
   beforeEach(() => {
     prisma = {
       client: {
-        branch: { findUnique: jest.fn().mockResolvedValue({ id: 'b1', minBookingLeadDays: 1 }) },
+        branch: { findUnique: jest.fn().mockResolvedValue({ id: 'b1', minBookingLeadDays: 1, timezone: 'America/La_Paz' }) },
         bookingBlackoutDate: { findMany: jest.fn().mockResolvedValue([]) },
       },
     };
@@ -72,7 +72,7 @@ describe('BookingStorefrontService', () => {
         where: { branchId: 'b1' },
         orderBy: { date: 'asc' },
       });
-      expect(result).toEqual({ minBookingLeadDays: 1, dates: ['2026-01-01'] });
+      expect(result).toEqual({ minBookingLeadDays: 1, timezone: 'America/La_Paz', dates: ['2026-01-01'] });
     });
   });
 

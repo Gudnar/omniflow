@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost, apiPatch } from '@/lib/api-client';
 import type { Appointment, AppointmentStatus, AppointmentStatusHistoryEntry } from '@/lib/types';
+import { formatZonedDateTime, utcToZonedInputValue, zonedInputValueToUtc } from './timezone';
 
 const STATUS_LABELS: Record<AppointmentStatus, string> = {
   PENDING: 'Pendiente',
@@ -31,15 +32,6 @@ const NEXT_STEPS: Record<AppointmentStatus, AppointmentStatus[]> = {
   CANCELLED: [],
   NO_SHOW: [],
 };
-
-// `<input type="datetime-local">` reads/writes local time with no timezone
-// suffix — converts an ISO string to that format for display, inverse of
-// `new Date(value).toISOString()` used when sending the edit back.
-function toLocalDatetimeInputValue(iso: string): string {
-  const d = new Date(iso);
-  const offsetMs = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16);
-}
 
 export function AppointmentDetailPanel({
   appointmentId,
@@ -88,7 +80,7 @@ export function AppointmentDetailPanel({
 
   const startEdit = () => {
     if (!appointment) return;
-    setEditForm({ startAt: toLocalDatetimeInputValue(appointment.startAt), notes: appointment.notes ?? '' });
+    setEditForm({ startAt: utcToZonedInputValue(appointment.startAt, appointment.branch.timezone), notes: appointment.notes ?? '' });
     setEditing(true);
   };
 
@@ -97,7 +89,7 @@ export function AppointmentDetailPanel({
     setBusy(true);
     try {
       const durationMs = new Date(appointment.endAt).getTime() - new Date(appointment.startAt).getTime();
-      const newStartAt = new Date(editForm.startAt);
+      const newStartAt = zonedInputValueToUtc(editForm.startAt, appointment.branch.timezone);
       const newEndAt = new Date(newStartAt.getTime() + durationMs);
       await apiPatch(`/appointments/${appointmentId}`, tokens?.accessToken, {
         startAt: newStartAt.toISOString(),
@@ -150,7 +142,7 @@ export function AppointmentDetailPanel({
       <div className="flex items-center justify-between p-5 border-b border-gray-100">
         <div>
           <p className="text-base font-bold text-gray-900">{appointment.contact.name}</p>
-          <p className="text-xs text-gray-400">{new Date(appointment.startAt).toLocaleString()}</p>
+          <p className="text-xs text-gray-400">{formatZonedDateTime(appointment.startAt, appointment.branch.timezone)}</p>
         </div>
         <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 transition shrink-0">
           <X className="w-4 h-4" />
@@ -240,7 +232,10 @@ export function AppointmentDetailPanel({
             </div>
           ) : (
             <div className="text-sm text-gray-900 space-y-1">
-              <p>{new Date(appointment.startAt).toLocaleString()} → {new Date(appointment.endAt).toLocaleString()}</p>
+              <p>
+                {formatZonedDateTime(appointment.startAt, appointment.branch.timezone)} →{' '}
+                {formatZonedDateTime(appointment.endAt, appointment.branch.timezone)}
+              </p>
               {appointment.notes && <p className="text-gray-500">{appointment.notes}</p>}
             </div>
           )}
@@ -288,7 +283,7 @@ export function AppointmentDetailPanel({
                   </p>
                   {entry.note && <p className="text-xs text-gray-500">{entry.note}</p>}
                 </div>
-                <p className="text-xs text-gray-400 shrink-0">{new Date(entry.createdAt).toLocaleString()}</p>
+                <p className="text-xs text-gray-400 shrink-0">{formatZonedDateTime(entry.createdAt, appointment.branch.timezone)}</p>
               </div>
             ))}
             {history.length === 0 && <p className="text-sm text-gray-400">Sin cambios de estado todavía.</p>}
