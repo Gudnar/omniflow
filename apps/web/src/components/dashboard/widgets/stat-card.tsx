@@ -1,7 +1,7 @@
 'use client';
 
 import { AreaChart, Area, ResponsiveContainer } from 'recharts';
-import { ArrowUp } from 'lucide-react';
+import { ArrowUp, ArrowDown } from 'lucide-react';
 
 interface StatCardProps {
   icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
@@ -9,7 +9,7 @@ interface StatCardProps {
   iconColor: string;
   label: string;
   value: string;
-  change: string;
+  changePct: number | null;
   sparklineColor: string;
   sparklineData: number[];
 }
@@ -20,11 +20,12 @@ export function StatCard({
   iconColor,
   label,
   value,
-  change,
+  changePct,
   sparklineColor,
   sparklineData,
 }: StatCardProps) {
   const data = sparklineData.map((v, i) => ({ i, v }));
+  const isDown = changePct !== null && changePct < 0;
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 flex flex-col">
@@ -41,10 +42,16 @@ export function StatCard({
         </div>
       </div>
 
-      <div className="flex items-center gap-1 text-xs font-semibold text-emerald-600 mb-2">
-        <ArrowUp className="w-3.5 h-3.5" />
-        <span>{change}</span>
-        <span className="text-gray-400 font-normal">vs semana anterior</span>
+      <div className={`flex items-center gap-1 text-xs font-semibold mb-2 ${isDown ? 'text-red-600' : 'text-emerald-600'}`}>
+        {changePct === null ? (
+          <span className="text-gray-400 font-normal">Sin datos de la semana anterior</span>
+        ) : (
+          <>
+            {isDown ? <ArrowDown className="w-3.5 h-3.5" /> : <ArrowUp className="w-3.5 h-3.5" />}
+            <span>{Math.abs(changePct)}%</span>
+            <span className="text-gray-400 font-normal">vs semana anterior</span>
+          </>
+        )}
       </div>
 
       <div className="h-10 -mx-1">

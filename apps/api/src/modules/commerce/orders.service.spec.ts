@@ -22,6 +22,7 @@ describe('OrdersService', () => {
   let prisma: any;
   let tx: any;
   let eventsService: any;
+  let messagesService: any;
 
   beforeEach(() => {
     tx = {
@@ -36,11 +37,14 @@ describe('OrdersService', () => {
         order: { findUnique: jest.fn(), findMany: jest.fn(), update: jest.fn() },
         orderStatusHistory: { findMany: jest.fn() },
         fulfillment: { updateMany: jest.fn() },
+        cart: { findUnique: jest.fn() },
+        commerceSession: { findUnique: jest.fn() },
         $transaction: jest.fn((cb: any) => cb(tx)),
       },
     };
     eventsService = { emit: jest.fn() };
-    service = new OrdersService(prisma, eventsService);
+    messagesService = { create: jest.fn() };
+    service = new OrdersService(prisma, eventsService, messagesService);
   });
 
   describe('findOne', () => {
@@ -294,6 +298,51 @@ describe('OrdersService', () => {
         where: { orderId: 'o1' },
         orderBy: { createdAt: 'desc' },
       });
+    });
+  });
+
+  describe('sendReceipt', () => {
+    const fullOrder = order({
+      cartId: 'c1',
+      currency: 'BOB',
+      fulfillmentType: 'PICKUP',
+      items: [{ id: 'oi1', productNameSnapshot: 'Pizza Muzzarella', quantity: 2, unitPrice: '25', discount: '0', subtotal: '50' }],
+    });
+
+    it('throws ValidationError when the order\'s cart has no commerce session', async () => {
+      prisma.client.order.findUnique.mockResolvedValue(fullOrder);
+      prisma.client.cart.findUnique.mockResolvedValue({ commerceSessionId: null });
+
+      await expect(service.sendReceipt('o1', 'u1')).rejects.toThrow(ValidationError);
+      expect(messagesService.create).not.toHaveBeenCalled();
+    });
+
+    it('throws ValidationError when the commerce session has no linked conversation', async () => {
+      prisma.client.order.findUnique.mockResolvedValue(fullOrder);
+      prisma.client.cart.findUnique.mockResolvedValue({ commerceSessionId: 's1' });
+      prisma.client.commerceSession.findUnique.mockResolvedValue({ conversationId: null });
+
+      await expect(service.sendReceipt('o1', 'u1')).rejects.toThrow(ValidationError);
+      expect(messagesService.create).not.toHaveBeenCalled();
+    });
+
+    it('sends a formatted TEXT message to the linked conversation', async () => {
+      prisma.client.order.findUnique.mockResolvedValue(fullOrder);
+      prisma.client.cart.findUnique.mockResolvedValue({ commerceSessionId: 's1' });
+      prisma.client.commerceSession.findUnique.mockResolvedValue({ conversationId: 'conv1' });
+      messagesService.create.mockResolvedValue({ id: 'm1' });
+
+      const result = await service.sendReceipt('o1', 'u1');
+
+      expect(messagesService.create).toHaveBeenCalledWith('conv1', 'u1', {
+        direction: 'OUTBOUND',
+        type: 'TEXT',
+        content: expect.stringContaining('Pizza Muzzarella x2 — BOB 50.00'),
+      });
+      const [, , dto] = messagesService.create.mock.calls[0];
+      expect(dto.content).toContain('ORD-TEST');
+      expect(dto.content).toContain('Total: BOB 50.00');
+      expect(result).toEqual({ success: true, message: { id: 'm1' } });
     });
   });
 });

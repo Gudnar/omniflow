@@ -47,7 +47,16 @@ export default function StorefrontPage() {
   const [bannerIndex, setBannerIndex] = useState(0);
 
   const [fulfillmentType, setFulfillmentType] = useState<FulfillmentType>('PICKUP');
-  const [addressForm, setAddressForm] = useState({
+  const [addressForm, setAddressForm] = useState<{
+    label: string;
+    recipientName: string;
+    phone: string;
+    addressLine: string;
+    city: string;
+    notes: string;
+    latitude?: number;
+    longitude?: number;
+  }>({
     label: 'Casa',
     recipientName: '',
     phone: '',
@@ -207,18 +216,29 @@ export default function StorefrontPage() {
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         try {
+          // Two places this goes: (1) CommerceSession.metadata, so a
+          // PICKUP→delivery switch mid-session or an abandoned checkout
+          // still has it available (Order.customerLocation); (2) the address
+          // form itself (below), so confirmOrder()'s POST to
+          // /storefront/sessions/:token/addresses carries real coordinates
+          // on the saved CustomerAddress — CreateAddressDto already accepts
+          // latitude/longitude, no reverse-geocoding needed to make this a
+          // real, selectable location rather than a side GPS pin.
           await apiPost(`/storefront/sessions/${token}/location`, undefined, {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
           });
+          setAddressForm((prev) => ({
+            ...prev,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            // Only fills a blank address line — never overwrites text the
+            // customer already typed, so GPS and "otra dirección" can be
+            // combined (confirm the pin, then add a reference note).
+            addressLine: prev.addressLine || 'Ubicación compartida por GPS',
+          }));
           setLocationSaved(true);
-          // This only attaches GPS coordinates for the operator to see later
-          // (Order.customerLocation, shown as a map link) — it can't fill in
-          // a real street address without a reverse-geocoding provider,
-          // which this project doesn't integrate. The customer still has to
-          // type the address line below; this toast says so up front instead
-          // of leaving the button looking broken when nothing visibly changes.
-          toast.success('Ubicación registrada. Aun así, escribe tu dirección abajo para que el repartidor la encuentre.');
+          toast.success('Ubicación confirmada. Revisa el mapa abajo y completa los datos para el repartidor.');
         } catch (err: any) {
           toast.error(err.message ?? 'No se pudo guardar tu ubicación.');
         } finally {
@@ -562,16 +582,33 @@ export default function StorefrontPage() {
 
           {fulfillmentType !== 'PICKUP' && (
             <div className="space-y-3 mb-6">
-              <button
-                onClick={useMyLocation}
-                disabled={locating}
-                className={`flex items-center gap-1.5 text-sm px-3.5 py-2 border rounded-xl disabled:opacity-50 ${
-                  locationSaved ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200'
-                }`}
-              >
-                {locationSaved ? <Check className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
-                {locating ? 'Ubicando...' : locationSaved ? 'Ubicación guardada' : 'Usar mi ubicación actual'}
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={useMyLocation}
+                  disabled={locating}
+                  className={`flex items-center gap-1.5 text-sm px-3.5 py-2 border rounded-xl disabled:opacity-50 ${
+                    locationSaved ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-white border-gray-200'
+                  }`}
+                >
+                  {locationSaved ? <Check className="w-4 h-4" /> : <MapPin className="w-4 h-4" />}
+                  {locating ? 'Ubicando...' : locationSaved ? 'Ubicación confirmada' : 'Usar mi ubicación actual'}
+                </button>
+                {locationSaved && addressForm.latitude && addressForm.longitude && (
+                  <a
+                    href={`https://www.google.com/maps?q=${addressForm.latitude},${addressForm.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 underline"
+                  >
+                    Ver en el mapa
+                  </a>
+                )}
+              </div>
+              {!locationSaved && (
+                <p className="text-xs text-gray-400">
+                  O escribe otra dirección de entrega abajo sin usar tu ubicación actual.
+                </p>
+              )}
               <input
                 placeholder="Nombre de quien recibe"
                 value={addressForm.recipientName}

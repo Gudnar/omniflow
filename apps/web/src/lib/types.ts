@@ -888,3 +888,28 @@ export interface WebchatMessage {
   content: string;
   createdAt: string;
 }
+
+// GET /analytics/overview — backs the dashboard home page. `changePct` is
+// null (not 0) when there's no prior-week data to compare against, so the
+// UI can say "sin datos previos" instead of a misleading "+0%"/"-100%".
+export interface AnalyticsTrend {
+  value: number;
+  changePct: number | null;
+  sparkline: number[];
+}
+
+export interface AnalyticsOverview {
+  stats: {
+    newLeads: AnalyticsTrend;
+    conversations: AnalyticsTrend;
+    orders: AnalyticsTrend;
+    revenue: AnalyticsTrend;
+    appointments: AnalyticsTrend;
+  };
+  channelBreakdown: { channel: BackendChannel; count: number }[];
+  orderFunnel: { status: OrderStatus; count: number }[];
+  upcomingAppointments: { id: string; contactName: string; serviceName: string | null; startAt: string; status: AppointmentStatus }[];
+  recentLeads: { id: string; name: string; phone: string | null; createdAt: string }[];
+  salesByBranch: { branchId: string; branchName: string; total: number }[];
+  recentActivity: { id: string; type: string; subject: string; description: string | null; contactName: string; occurredAt: string }[];
+}

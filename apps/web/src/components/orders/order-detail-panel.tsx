@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Package, Clock, Truck, MapPin, Hash } from 'lucide-react';
+import { X, Package, Clock, Truck, MapPin, Hash, Send } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost, apiPatch } from '@/lib/api-client';
@@ -152,6 +152,18 @@ export function OrderDetailPanel({
     }
   };
 
+  const sendReceipt = async () => {
+    setBusy(true);
+    try {
+      await apiPost(`/orders/${orderId}/send-receipt`, tokens?.accessToken, {});
+      toast.success('Nota de venta enviada al cliente');
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo enviar la nota de venta');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const cancel = async () => {
     if (!confirm('¿Cancelar este pedido?')) return;
     setBusy(true);
@@ -177,6 +189,10 @@ export function OrderDetailPanel({
 
   const nextSteps = NEXT_STEPS[order.status];
   const canCancel = order.status !== 'DELIVERED' && order.status !== 'CANCELLED';
+  // "Después de confirmar cada pedido" — only offered once the order has
+  // actually been confirmed (not while still PENDING approval, not once
+  // cancelled).
+  const canSendReceipt = order.status !== 'PENDING' && order.status !== 'CANCELLED';
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden max-h-[calc(100vh-8rem)]">
@@ -220,6 +236,15 @@ export function OrderDetailPanel({
               className="px-4 py-2 border border-gray-300 disabled:opacity-50 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
             >
               {order.status === 'PENDING' ? 'Rechazar pedido' : 'Cancelar pedido'}
+            </button>
+          )}
+          {canSendReceipt && (
+            <button
+              onClick={sendReceipt}
+              disabled={busy}
+              className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 disabled:opacity-50 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <Send className="w-3.5 h-3.5" /> Enviar nota de venta
             </button>
           )}
         </div>

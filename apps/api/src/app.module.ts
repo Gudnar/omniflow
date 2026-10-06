@@ -36,6 +36,7 @@ import { LinkPageModule } from './modules/link-page/link-page.module';
 import { RealtimeModule } from './modules/realtime/realtime.module';
 import { WebchatModule } from './modules/webchat/webchat.module';
 import { ConversationWindowModule } from './modules/conversation-window/conversation-window.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { JwtAuthGuard, PermissionsGuard } from './modules/auth/guards';
 
 @Module({
@@ -89,6 +90,7 @@ import { JwtAuthGuard, PermissionsGuard } from './modules/auth/guards';
     RealtimeModule,
     WebchatModule,
     ConversationWindowModule,
+    AnalyticsModule,
   ],
   providers: [
     {

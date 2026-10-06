@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ContactsModule } from '../contacts/contacts.module';
 import { BookingModule } from '../booking/booking.module';
+import { ConversationsModule } from '../conversations/conversations.module';
 import { AddressesController } from './addresses.controller';
 import { AddressesService } from './addresses.service';
 import { CommerceSessionsController } from './commerce-sessions.controller';
@@ -14,7 +15,7 @@ import { ContactCommerceController } from './contact-commerce.controller';
 import { ContactCommerceService } from './contact-commerce.service';
 
 @Module({
-  imports: [PrismaModule, ContactsModule, BookingModule],
+  imports: [PrismaModule, ContactsModule, BookingModule, ConversationsModule],
   controllers: [
     AddressesController,
     CommerceSessionsController,

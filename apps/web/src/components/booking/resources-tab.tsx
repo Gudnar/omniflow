@@ -5,7 +5,7 @@ import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api-client';
-import type { BookingResource, BookingResourceType, BookingService, UserSchedule, UserTimeOff } from '@/lib/types';
+import type { BookingResource, BookingResourceType, BookingResourceStatus, BookingService, UserSchedule, UserTimeOff } from '@/lib/types';
 import { Modal } from '@/components/ui/modal';
 
 const DAY_LABELS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -29,7 +29,7 @@ interface Branch {
   name: string;
 }
 
-const EMPTY_FORM = { branchId: '', name: '', type: 'STAFF' as BookingResourceType, userId: '' };
+const EMPTY_FORM = { branchId: '', name: '', type: 'STAFF' as BookingResourceType, userId: '', status: 'ACTIVE' as BookingResourceStatus };
 
 export function ResourcesTab() {
   const { tokens } = useAuth();
@@ -40,6 +40,7 @@ export function ResourcesTab() {
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
+  const [editingResourceId, setEditingResourceId] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
 
   const refetch = () => apiGet<BookingResource[]>('/booking/resources', tokens?.accessToken).then(setResources);
@@ -55,18 +56,34 @@ export function ResourcesTab() {
       .finally(() => setLoading(false));
   }, [tokens]);
 
-  const create = async () => {
+  const openCreateModal = () => {
+    setEditingResourceId(null);
+    setForm(EMPTY_FORM);
+    setShowModal(true);
+  };
+
+  const openEditModal = (resource: BookingResource) => {
+    setEditingResourceId(resource.id);
+    setForm({ branchId: resource.branchId, name: resource.name, type: resource.type, userId: resource.userId ?? '', status: resource.status });
+    setShowModal(true);
+  };
+
+  const save = async () => {
+    const payload = { ...form, userId: form.type === 'STAFF' ? form.userId || undefined : undefined };
     try {
-      await apiPost('/booking/resources', tokens?.accessToken, {
-        ...form,
-        userId: form.type === 'STAFF' ? form.userId || undefined : undefined,
-      });
+      if (editingResourceId) {
+        await apiPatch(`/booking/resources/${editingResourceId}`, tokens?.accessToken, payload);
+        toast.success('Recurso actualizado correctamente');
+      } else {
+        await apiPost('/booking/resources', tokens?.accessToken, payload);
+        toast.success('Recurso creado correctamente');
+      }
       await refetch();
       setShowModal(false);
+      setEditingResourceId(null);
       setForm(EMPTY_FORM);
-      toast.success('Recurso creado correctamente');
     } catch (err: any) {
-      toast.error(err.message ?? 'No se pudo crear el recurso');
+      toast.error(err.message ?? (editingResourceId ? 'No se pudo actualizar el recurso' : 'No se pudo crear el recurso'));
     }
   };
 
@@ -96,7 +113,7 @@ export function ResourcesTab() {
     <div className="space-y-4">
       <div className="flex justify-end">
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openCreateModal}
           className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-semibold text-white transition"
         >
           <Plus className="w-4 h-4" />
@@ -135,12 +152,20 @@ export function ResourcesTab() {
             resource={selected}
             services={services}
             onChanged={refetch}
+            onEdit={() => openEditModal(selected)}
             onDelete={() => remove(selected.id)}
           />
         )}
       </div>
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title="Nuevo recurso">
+      <Modal
+        open={showModal}
+        onClose={() => {
+          setShowModal(false);
+          setEditingResourceId(null);
+        }}
+        title={editingResourceId ? 'Editar recurso' : 'Nuevo recurso'}
+      >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-900 mb-1.5">Nombre</label>
@@ -172,13 +197,28 @@ export function ResourcesTab() {
               <input value={form.userId} onChange={(e) => setForm({ ...form, userId: e.target.value })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm" />
             </div>
           )}
+          {editingResourceId && (
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-1.5">Estado</label>
+              <select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as BookingResourceStatus })} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white">
+                <option value="ACTIVE">Activo</option>
+                <option value="INACTIVE">Inactivo</option>
+              </select>
+            </div>
+          )}
         </div>
         <div className="flex gap-3 mt-6">
-          <button onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 font-medium text-sm">
+          <button
+            onClick={() => {
+              setShowModal(false);
+              setEditingResourceId(null);
+            }}
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 font-medium text-sm"
+          >
             Cancelar
           </button>
-          <button onClick={create} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm">
-            Crear
+          <button onClick={save} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm">
+            {editingResourceId ? 'Guardar cambios' : 'Crear'}
           </button>
         </div>
       </Modal>
@@ -190,11 +230,13 @@ function ResourceDetailPanel({
   resource,
   services,
   onChanged,
+  onEdit,
   onDelete,
 }: {
   resource: BookingResource;
   services: BookingService[];
   onChanged: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   const { tokens } = useAuth();
@@ -368,9 +410,14 @@ function ResourceDetailPanel({
           <p className="text-base font-bold text-gray-900">{resource.name}</p>
           <p className="text-xs text-gray-400">{TYPE_LABELS[resource.type]} · {resource.branch.name}</p>
         </div>
-        <button onClick={onDelete} className="px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg">
-          Eliminar
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button onClick={onEdit} className="px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg border border-gray-200">
+            Editar
+          </button>
+          <button onClick={onDelete} className="px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg">
+            Eliminar
+          </button>
+        </div>
       </div>
 
       <div>

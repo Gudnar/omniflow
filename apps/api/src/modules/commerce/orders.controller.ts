@@ -66,6 +66,14 @@ export class OrdersController {
     return this.ordersService.updateFulfillment(id, dto);
   }
 
+  @Post(':id/send-receipt')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('orders.manage')
+  @HttpCode(200)
+  sendReceipt(@Request() req: any, @Param('id') id: string) {
+    return this.ordersService.sendReceipt(id, req.user.userId);
+  }
+
   @Patch(':id/tracking-code')
   @UseGuards(JwtAuthGuard)
   @RequirePermission('orders.manage')

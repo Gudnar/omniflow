@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundError, ValidationError } from '@omniflow/utils';
 import { EventsService } from '../events/events.service';
+import { MessagesService } from '../conversations/messages.service';
 import {
   ListOrdersQueryDto,
   UpdateOrderStatusDto,
@@ -68,11 +69,18 @@ function serializeOrder(order: any) {
   };
 }
 
+const FULFILLMENT_TYPE_LABELS: Record<string, string> = {
+  PICKUP: 'Retiro en sucursal',
+  LOCAL_DELIVERY: 'Entrega a domicilio',
+  SHIPPING: 'Envío',
+};
+
 @Injectable()
 export class OrdersService {
   constructor(
     private prisma: PrismaService,
     private eventsService: EventsService,
+    private messagesService: MessagesService,
   ) {}
 
   async list(query: ListOrdersQueryDto) {
@@ -159,6 +167,58 @@ export class OrdersService {
     await this.findOne(id);
     await this.prisma.client.order.update({ where: { id }, data: { trackingCode: dto.trackingCode } });
     return this.findOne(id);
+  }
+
+  // Plain text, not a new Message type — the dashboard/webchat bubbles only
+  // render TEXT/CTA/AUDIO/SYSTEM/NOTE specially (everything else, including
+  // a hypothetical "RECEIPT" type, would just fall back to a plain-text
+  // bubble anyway), so a formatted TEXT message gets the same result with no
+  // frontend rendering work. Numbers are already plain numbers here (the
+  // order passed in went through serializeOrder()).
+  private buildReceiptText(order: any): string {
+    const lines = [`🧾 Nota de venta — Pedido ${order.orderNumber}`, ''];
+    for (const item of order.items) {
+      lines.push(`${item.productNameSnapshot} x${item.quantity} — ${order.currency} ${item.subtotal.toFixed(2)}`);
+    }
+    lines.push('', `Subtotal: ${order.currency} ${order.subtotal.toFixed(2)}`);
+    if (order.discount > 0) lines.push(`Descuento: -${order.currency} ${order.discount.toFixed(2)}`);
+    if (order.shipping > 0) lines.push(`Envío: ${order.currency} ${order.shipping.toFixed(2)}`);
+    if (order.tax > 0) lines.push(`Impuestos: ${order.currency} ${order.tax.toFixed(2)}`);
+    lines.push(`Total: ${order.currency} ${order.total.toFixed(2)}`, '');
+    lines.push(`Entrega: ${FULFILLMENT_TYPE_LABELS[order.fulfillmentType] ?? order.fulfillmentType}`);
+    if (order.address) lines.push(`Dirección: ${order.address.addressLine}`);
+    if (order.trackingCode) lines.push(`Código de seguimiento: ${order.trackingCode}`);
+    lines.push('', '¡Gracias por tu compra!');
+    return lines.join('\n');
+  }
+
+  // Resolves the conversation this order's cart was checked out from
+  // (Order.cartId → Cart.commerceSessionId → CommerceSession.conversationId)
+  // — channel-agnostic: whichever conversation (WhatsApp, webchat, etc.) the
+  // customer was in when they checked out, so this isn't webchat-only.
+  async sendReceipt(id: string, actorUserId: string) {
+    const order = await this.findOne(id);
+
+    const cart = await this.prisma.client.cart.findUnique({
+      where: { id: order.cartId },
+      select: { commerceSessionId: true },
+    });
+    const session = cart?.commerceSessionId
+      ? await this.prisma.client.commerceSession.findUnique({
+          where: { id: cart.commerceSessionId },
+          select: { conversationId: true },
+        })
+      : null;
+    if (!session?.conversationId) {
+      throw new ValidationError('Este pedido no tiene una conversación asociada para enviarle la nota de venta.');
+    }
+
+    const message = await this.messagesService.create(session.conversationId, actorUserId, {
+      direction: 'OUTBOUND',
+      type: 'TEXT',
+      content: this.buildReceiptText(order),
+    });
+    return { success: true, message };
   }
 
   private async transition(

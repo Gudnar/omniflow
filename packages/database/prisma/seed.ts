@@ -47,6 +47,7 @@ async function main() {
     { code: 'comments.manage', description: 'Reply to Facebook Page comments' },
     { code: 'link-page.read', description: 'Read the public link-in-bio page and its links' },
     { code: 'link-page.manage', description: 'Create, update, and reorder the public link-in-bio page and its links' },
+    { code: 'analytics.read', description: 'Read dashboard metrics and reports' },
   ];
 
   for (const perm of permissions) {
