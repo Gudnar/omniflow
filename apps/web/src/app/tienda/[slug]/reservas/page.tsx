@@ -145,12 +145,12 @@ export default function BookingStorefrontPage() {
   const whatsappCatalogLink = store.whatsappPhone ? waMeLink(store.whatsappPhone, 'Hola, quiero reservar una cita') : null;
 
   return (
-    <div style={{ backgroundColor: settings.backgroundColor, color: settings.textColor }} className="min-h-screen pb-24">
+    <div style={{ backgroundColor: '#f7f7f7', color: settings.textColor }} className="min-h-screen pb-24">
       {view === 'services' && (
-        <main className="max-w-2xl mx-auto px-4 sm:px-6 pt-4 pb-6">
-          <div className="flex items-center justify-between mb-4 gap-2">
+        <main className="max-w-2xl mx-auto px-4 sm:px-6 pt-5 pb-6">
+          <div className="flex items-center justify-between mb-5 gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
-              <button onClick={() => setShowInfo(true)} className="p-1.5 -ml-1.5 text-gray-500 flex-shrink-0">
+              <button onClick={() => setShowInfo(true)} className="p-2 -ml-2 text-gray-500 flex-shrink-0 rounded-full hover:bg-gray-100">
                 <Menu className="w-5 h-5" />
               </button>
               {settings.logo ? (
@@ -172,7 +172,7 @@ export default function BookingStorefrontPage() {
               href={whatsappCatalogLink}
               target="_blank"
               rel="noreferrer"
-              className="flex items-center justify-between w-full mb-4 px-4 py-3 rounded-xl text-white"
+              className="flex items-center justify-between w-full mb-3 px-5 py-3.5 rounded-2xl text-white shadow-sm"
               style={{ backgroundColor: '#25D366' }}
             >
               <span className="text-sm font-bold">Estás viendo nuestros servicios. Para reservar, escríbenos por WhatsApp</span>
@@ -183,8 +183,7 @@ export default function BookingStorefrontPage() {
           {catalogEnabled && (
             <button
               onClick={() => router.push(isVisitor ? `/tienda/${slug}` : `/tienda/${slug}?s=${token}`)}
-              className="flex items-center justify-between w-full mb-4 px-4 py-3 rounded-xl border"
-              style={{ borderColor: tint(settings.buttonColor, 30), backgroundColor: tint(settings.buttonColor, 8) }}
+              className="flex items-center justify-between w-full mb-3 px-5 py-3.5 rounded-2xl bg-white shadow-sm"
             >
               <span className="flex items-center gap-2 text-sm font-bold" style={{ color: settings.buttonColor }}>
                 <ShoppingBag className="w-4 h-4" /> Ver catálogo de productos
@@ -193,7 +192,7 @@ export default function BookingStorefrontPage() {
             </button>
           )}
 
-          <h2 className="font-extrabold text-lg mb-3">Reservar una cita</h2>
+          <h2 className="font-extrabold text-2xl mb-4 tracking-tight">Reservar una cita</h2>
 
           <div className="space-y-3">
             {(services ?? []).map((s) => {
@@ -201,48 +200,48 @@ export default function BookingStorefrontPage() {
                 ? waMeLink(store.whatsappPhone, `Hola, quiero reservar "${s.name}"`)
                 : null;
               return (
-                <div key={s.id} className="flex items-center gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
+                <div key={s.id} className="bg-white rounded-3xl shadow-sm overflow-hidden">
                   <button
                     onClick={() => !serviceWhatsappHref && openService(s)}
                     disabled={!!serviceWhatsappHref}
-                    className="flex-1 min-w-0 flex items-center gap-3 text-left disabled:cursor-default"
+                    className="w-full flex items-center gap-4 p-4 text-left disabled:cursor-default"
                   >
                     <div
-                      className="w-14 h-14 rounded-xl flex-shrink-0 flex items-center justify-center"
+                      className="w-16 h-16 rounded-2xl flex-shrink-0 flex items-center justify-center"
                       style={{ backgroundColor: tint(settings.buttonColor, 12), color: settings.buttonColor }}
                     >
-                      <CalendarDays className="w-6 h-6" />
+                      <CalendarDays className="w-7 h-7" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm truncate">{s.name}</p>
-                      {s.description && <p className="text-xs text-gray-400 truncate">{s.description}</p>}
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <span className="font-bold text-sm" style={{ color: settings.buttonColor }}>
-                          Bs. {s.price.toFixed(2)}
-                        </span>
-                        <span className="text-xs text-gray-400">· {s.durationMinutes} min</span>
+                      <p className="font-bold text-[15px] truncate">{s.name}</p>
+                      {s.description && <p className="text-xs text-gray-400 truncate mt-0.5">{s.description}</p>}
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <span className="font-extrabold text-base">Bs. {s.price.toFixed(2)}</span>
+                        <span className="text-xs font-medium text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{s.durationMinutes} min</span>
                       </div>
                     </div>
                   </button>
-                  {serviceWhatsappHref ? (
-                    <a
-                      href={serviceWhatsappHref}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex-shrink-0 px-3.5 py-2 rounded-full text-white text-xs font-bold"
-                      style={{ backgroundColor: '#25D366' }}
-                    >
-                      Reservar por WhatsApp
-                    </a>
-                  ) : (
-                    <button
-                      onClick={() => openService(s)}
-                      className="flex-shrink-0 px-3.5 py-2 rounded-full text-white text-xs font-bold"
-                      style={{ backgroundColor: settings.buttonColor }}
-                    >
-                      Reservar
-                    </button>
-                  )}
+                  <div className="px-4 pb-4">
+                    {serviceWhatsappHref ? (
+                      <a
+                        href={serviceWhatsappHref}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block w-full text-center py-3 rounded-2xl text-white text-sm font-bold"
+                        style={{ backgroundColor: '#25D366' }}
+                      >
+                        Reservar por WhatsApp
+                      </a>
+                    ) : (
+                      <button
+                        onClick={() => openService(s)}
+                        className="w-full py-3 rounded-2xl text-white text-sm font-bold"
+                        style={{ backgroundColor: settings.buttonColor }}
+                      >
+                        Reservar
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -272,14 +271,17 @@ export default function BookingStorefrontPage() {
 
       {view === 'slots' && selectedService && (
         <main className="max-w-lg mx-auto px-4 sm:px-8 py-6">
-          <button onClick={() => setView('calendar')} className="flex items-center gap-1 text-sm text-gray-500 mb-4">
+          <button onClick={() => setView('calendar')} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 mb-5">
             <ArrowLeft className="w-4 h-4" /> Elegir otra fecha
           </button>
-          <h2 className="font-extrabold text-lg mb-1">{selectedService.name}</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            {selectedDate &&
-              new Date(`${selectedDate}T00:00:00.000Z`).toLocaleDateString('es-BO', { timeZone: 'UTC', dateStyle: 'full' })}
-          </p>
+
+          <div className="bg-white rounded-3xl shadow-sm p-5 mb-4">
+            <h2 className="font-extrabold text-xl tracking-tight">{selectedService.name}</h2>
+            <p className="text-sm text-gray-400 mt-1 capitalize">
+              {selectedDate &&
+                new Date(`${selectedDate}T00:00:00.000Z`).toLocaleDateString('es-BO', { timeZone: 'UTC', dateStyle: 'full' })}
+            </p>
+          </div>
 
           {loadingSlots && (
             <div className="flex justify-center py-12">
@@ -288,25 +290,30 @@ export default function BookingStorefrontPage() {
           )}
 
           {!loadingSlots && availableSlots && availableSlots.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-12">Sin horarios disponibles ese día. Elige otra fecha.</p>
+            <div className="bg-white rounded-3xl shadow-sm py-12 px-6 text-center">
+              <p className="text-sm text-gray-400">Sin horarios disponibles ese día. Elige otra fecha.</p>
+            </div>
           )}
 
           {!loadingSlots && availableSlots && availableSlots.length > 0 && (
-            <div className="grid grid-cols-3 gap-2">
-              {availableSlots.map((slot) => (
-                <button
-                  key={slot.startAt}
-                  onClick={() => {
-                    setSelectedSlot(slot);
-                    setView('confirm');
-                  }}
-                  className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border text-sm font-semibold"
-                  style={{ borderColor: tint(settings.buttonColor, 30), color: settings.buttonColor }}
-                >
-                  <Clock className="w-3.5 h-3.5" />
-                  {new Date(slot.startAt).toISOString().slice(11, 16)}
-                </button>
-              ))}
+            <div className="bg-white rounded-3xl shadow-sm p-4">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 px-1">Horarios disponibles</p>
+              <div className="grid grid-cols-3 gap-2.5">
+                {availableSlots.map((slot) => (
+                  <button
+                    key={slot.startAt}
+                    onClick={() => {
+                      setSelectedSlot(slot);
+                      setView('confirm');
+                    }}
+                    className="flex items-center justify-center gap-1.5 py-3 rounded-2xl border-2 text-sm font-bold transition hover:bg-gray-50"
+                    style={{ borderColor: tint(settings.buttonColor, 25), color: settings.buttonColor }}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    {new Date(slot.startAt).toISOString().slice(11, 16)}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </main>
@@ -314,36 +321,36 @@ export default function BookingStorefrontPage() {
 
       {view === 'confirm' && selectedService && selectedSlot && (
         <main className="max-w-lg mx-auto px-4 sm:px-8 py-6">
-          <button onClick={() => setView('slots')} className="flex items-center gap-1 text-sm text-gray-500 mb-4">
+          <button onClick={() => setView('slots')} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 mb-5">
             <ArrowLeft className="w-4 h-4" /> Elegir otro horario
           </button>
-          <h2 className="font-extrabold text-lg mb-4">Confirmar reserva</h2>
+          <h2 className="font-extrabold text-2xl mb-4 tracking-tight">Confirmar reserva</h2>
 
-          <div className="bg-white border border-gray-100 rounded-2xl p-4 mb-6 text-sm space-y-2 shadow-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Servicio</span>
-              <span className="font-semibold">{selectedService.name}</span>
+          <div className="bg-white rounded-3xl shadow-sm p-5 mb-6 divide-y divide-gray-100">
+            <div className="flex justify-between items-center pb-3">
+              <span className="text-sm text-gray-400">Servicio</span>
+              <span className="font-bold text-sm text-right">{selectedService.name}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Fecha</span>
-              <span className="font-semibold">
+            <div className="flex justify-between items-center py-3">
+              <span className="text-sm text-gray-400">Fecha</span>
+              <span className="font-bold text-sm text-right">
                 {new Date(selectedSlot.startAt).toLocaleDateString('es-BO', { timeZone: 'UTC', dateStyle: 'long' })}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Hora</span>
-              <span className="font-semibold">{new Date(selectedSlot.startAt).toISOString().slice(11, 16)}</span>
+            <div className="flex justify-between items-center py-3">
+              <span className="text-sm text-gray-400">Hora</span>
+              <span className="font-bold text-sm">{new Date(selectedSlot.startAt).toISOString().slice(11, 16)}</span>
             </div>
-            <div className="flex justify-between font-bold pt-2 border-t border-gray-100 mt-2">
-              <span>Total</span>
-              <span>Bs. {selectedService.price.toFixed(2)}</span>
+            <div className="flex justify-between items-center pt-3">
+              <span className="font-extrabold text-base">Total</span>
+              <span className="font-extrabold text-base">Bs. {selectedService.price.toFixed(2)}</span>
             </div>
           </div>
 
           <button
             onClick={confirmBooking}
             disabled={busy}
-            className="w-full py-3.5 rounded-2xl text-white font-extrabold disabled:opacity-50"
+            className="w-full py-4 rounded-2xl text-white font-extrabold text-[15px] shadow-sm disabled:opacity-50"
             style={{ backgroundColor: settings.buttonColor }}
           >
             {busy ? 'Confirmando...' : 'Confirmar reserva'}
@@ -353,33 +360,35 @@ export default function BookingStorefrontPage() {
 
       {view === 'success' && completedAppointment && (
         <main className="max-w-md mx-auto px-4 sm:px-8 py-16 text-center">
-          <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
-            <Check className="w-8 h-8" />
+          <div className="bg-white rounded-3xl shadow-sm p-8">
+            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
+              <Check className="w-8 h-8" strokeWidth={2.5} />
+            </div>
+            <h2 className="font-extrabold text-xl mb-1 tracking-tight">¡Reserva confirmada!</h2>
+            <p className="text-sm text-gray-400 mb-6 capitalize">
+              {new Date(completedAppointment.startAt).toLocaleDateString('es-BO', { timeZone: 'UTC', dateStyle: 'long' })} ·{' '}
+              {new Date(completedAppointment.startAt).toISOString().slice(11, 16)}
+            </p>
+            {session?.returnConversationUrl ? (
+              <a
+                href={session.returnConversationUrl}
+                className="inline-block w-full py-3.5 rounded-2xl text-white font-extrabold"
+                style={{ backgroundColor: '#25D366' }}
+              >
+                Volver a la conversación
+              </a>
+            ) : store.whatsappPhone ? (
+              <a
+                href={waMeLink(store.whatsappPhone, `Ya confirmé mi reserva del ${completedAppointment.startAt}`)}
+                className="inline-block w-full py-3.5 rounded-2xl text-white font-extrabold"
+                style={{ backgroundColor: '#25D366' }}
+              >
+                Volver a WhatsApp
+              </a>
+            ) : (
+              <p className="text-xs text-gray-400">Ya puedes cerrar esta ventana y continuar tu conversación por WhatsApp.</p>
+            )}
           </div>
-          <h2 className="font-extrabold text-xl mb-1">¡Reserva confirmada!</h2>
-          <p className="text-sm text-gray-500 mb-6">
-            {new Date(completedAppointment.startAt).toLocaleDateString('es-BO', { timeZone: 'UTC', dateStyle: 'long' })} ·{' '}
-            {new Date(completedAppointment.startAt).toISOString().slice(11, 16)}
-          </p>
-          {session?.returnConversationUrl ? (
-            <a
-              href={session.returnConversationUrl}
-              className="inline-block w-full py-3.5 rounded-2xl text-white font-extrabold"
-              style={{ backgroundColor: '#25D366' }}
-            >
-              Volver a la conversación
-            </a>
-          ) : store.whatsappPhone ? (
-            <a
-              href={waMeLink(store.whatsappPhone, `Ya confirmé mi reserva del ${completedAppointment.startAt}`)}
-              className="inline-block w-full py-3.5 rounded-2xl text-white font-extrabold"
-              style={{ backgroundColor: '#25D366' }}
-            >
-              Volver a WhatsApp
-            </a>
-          ) : (
-            <p className="text-xs text-gray-400">Ya puedes cerrar esta ventana y continuar tu conversación por WhatsApp.</p>
-          )}
         </main>
       )}
 
@@ -423,48 +432,58 @@ function BookingCalendarView({
 
   return (
     <main className="max-w-lg mx-auto px-4 sm:px-8 py-6">
-      <button onClick={onBack} className="flex items-center gap-1 text-sm text-gray-500 mb-4">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 mb-5">
         <ArrowLeft className="w-4 h-4" /> Volver a servicios
       </button>
-      <h2 className="font-extrabold text-lg mb-1">{service.name}</h2>
-      <p className="text-sm text-gray-500 mb-4">Elige una fecha ({service.durationMinutes} min · Bs. {service.price.toFixed(2)})</p>
 
-      <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <button onClick={() => setCalendarMonth((d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)))} className="p-1.5 rounded-lg hover:bg-gray-50">
+      <div className="bg-white rounded-3xl shadow-sm p-5 mb-4">
+        <h2 className="font-extrabold text-xl tracking-tight">{service.name}</h2>
+        <p className="text-sm text-gray-400 mt-1">Elige una fecha · {service.durationMinutes} min · Bs. {service.price.toFixed(2)}</p>
+      </div>
+
+      <div className="bg-white rounded-3xl p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <button
+            onClick={() => setCalendarMonth((d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1)))}
+            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100"
+          >
             <ChevronLeft className="w-4 h-4 text-gray-500" />
           </button>
-          <p className="font-bold text-sm">
+          <p className="font-extrabold text-[15px] capitalize">
             {MONTH_LABELS[month]} {year}
           </p>
-          <button onClick={() => setCalendarMonth((d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)))} className="p-1.5 rounded-lg hover:bg-gray-50">
+          <button
+            onClick={() => setCalendarMonth((d) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)))}
+            className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-gray-100"
+          >
             <ChevronRight className="w-4 h-4 text-gray-500" />
           </button>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 mb-1">
+        <div className="grid grid-cols-7 mb-1">
           {WEEKDAY_LABELS.map((d, i) => (
-            <div key={i} className="text-center text-[11px] font-semibold text-gray-400 py-1">
+            <div key={i} className="text-center text-[11px] font-bold text-gray-400 py-1">
               {d}
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-7 gap-1">
+        <div className="grid grid-cols-7">
           {cells.map((day, i) => {
             if (day === null) return <div key={`empty-${i}`} />;
             const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const disabled = dateStr < earliestStr || bookingConfig.dates.includes(dateStr);
             return (
-              <button
-                key={dateStr}
-                disabled={disabled}
-                onClick={() => onSelectDate(dateStr)}
-                className="aspect-square rounded-lg text-sm font-semibold disabled:text-gray-300 disabled:cursor-not-allowed"
-                style={!disabled ? { color: buttonColor } : undefined}
-              >
-                {day}
-              </button>
+              <div key={dateStr} className="flex items-center justify-center py-0.5">
+                <button
+                  disabled={disabled}
+                  onClick={() => onSelectDate(dateStr)}
+                  className="w-10 h-10 flex items-center justify-center rounded-full text-sm font-bold transition disabled:text-gray-300 disabled:cursor-not-allowed hover:enabled:bg-gray-100"
+                  style={!disabled ? { color: buttonColor } : undefined}
+                >
+                  {day}
+                </button>
+              </div>
             );
           })}
         </div>

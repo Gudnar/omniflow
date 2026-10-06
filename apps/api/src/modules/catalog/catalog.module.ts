@@ -4,6 +4,7 @@ import { CategoriesController } from './categories.controller';
 import { CategoriesService } from './categories.service';
 import { ProductsController } from './products.controller';
 import { ProductsService } from './products.service';
+import { ProductsImportExportService } from './products-import-export.service';
 import { VariantsController } from './variants.controller';
 import { VariantsService } from './variants.service';
 import { ProductMediaController } from './product-media.controller';
@@ -26,6 +27,7 @@ import { InventoryTransfersService } from './inventory-transfers.service';
   providers: [
     CategoriesService,
     ProductsService,
+    ProductsImportExportService,
     VariantsService,
     ProductMediaService,
     BranchProductsService,

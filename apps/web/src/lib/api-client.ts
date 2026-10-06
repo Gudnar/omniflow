@@ -107,3 +107,31 @@ export const apiDelete = <T>(path: string, token?: string) => request<T>(path, t
 
 export const apiUpload = <T>(path: string, token: string | undefined, formData: FormData) =>
   request<T>(path, token, { method: 'POST', body: formData });
+
+// For a binary response (file download) that `request()` can't handle —
+// it always parses JSON. Same 401-refresh-and-replay as request() above,
+// so an expired access token doesn't surface as a failed download.
+export async function apiDownload(path: string, token: string | undefined, filename: string): Promise<void> {
+  const doFetch = (t: string | undefined) =>
+    fetch(`/api${path}`, { headers: t ? { Authorization: `Bearer ${t}` } : {} });
+
+  let res = await doFetch(token);
+  if (res.status === 401 && token) {
+    const newToken = await refreshAccessToken();
+    if (newToken) res = await doFetch(newToken);
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new ApiError(res.status, body?.error?.message ?? `Request failed (${res.status})`);
+  }
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
