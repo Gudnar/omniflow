@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { Send, Loader2, Link2, Check } from 'lucide-react';
+import { Send, Loader2, Link2, Check, Lock } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api-client';
 import { connectAsVisitor } from '@/lib/socket-client';
 import type { ConversationWindowData } from '@/lib/types';
@@ -23,10 +23,8 @@ const GREEN_DARK = '#128C7E';
 // rather than a generic app button.
 const WHATSAPP_LINK_BLUE = '#0294FF';
 
-// A subtle, hand-rolled doodle tile evoking WhatsApp's chat wallpaper
-// without reproducing Meta's actual (trademarked) artwork — same visual
-// language, not a copy of the asset.
-const CHAT_WALLPAPER = `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cg fill='none' stroke='%23d3c8b8' stroke-width='1.2' opacity='0.55'%3E%3Ccircle cx='20' cy='24' r='3' fill='%23d3c8b8' stroke='none'/%3E%3Cpath d='M50 20 q6 -12 12 0 q6 12 12 0'/%3E%3Ccircle cx='95' cy='30' r='2' fill='%23d3c8b8' stroke='none'/%3E%3Cpath d='M15 65 q5 -9 10 0'/%3E%3Ccircle cx='60' cy='70' r='2.5' fill='%23d3c8b8' stroke='none'/%3E%3Cpath d='M85 85 q6 -11 12 0 q6 11 12 0'/%3E%3Ccircle cx='30' cy='100' r='2' fill='%23d3c8b8' stroke='none'/%3E%3Cpath d='M100 105 q5 -9 10 0'/%3E%3C/g%3E%3C/svg%3E")`;
+// The actual WhatsApp-style doodle wallpaper tile (apps/web/public/chat-wallpaper.png).
+const CHAT_WALLPAPER = `url("/chat-wallpaper.png")`;
 
 function formatDateSeparator(iso: string): string {
   const date = new Date(iso);
@@ -111,7 +109,7 @@ export default function ConversationWindowPage() {
     // the visual viewport the same way WhatsApp's own web/app UI does, so
     // the input stays pinned right above the keyboard instead of hidden
     // behind it.
-    <div className="h-dvh flex flex-col overflow-hidden" style={{ backgroundColor: '#e5ded8' }}>
+    <div className="h-dvh flex flex-col overflow-hidden" style={{ backgroundColor: '#efe8df' }}>
       <div className="shrink-0 flex items-center gap-3 px-4 py-2.5 text-white shadow-sm z-10" style={{ backgroundColor: GREEN_DARK }}>
         <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center overflow-hidden shrink-0">
           {data.businessLogo ? (
@@ -129,8 +127,22 @@ export default function ConversationWindowPage() {
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto px-3 sm:px-6 py-3"
-        style={{ backgroundColor: '#e5ded8', backgroundImage: CHAT_WALLPAPER, backgroundRepeat: 'repeat' }}
+        style={{ backgroundColor: '#efe8df', backgroundImage: CHAT_WALLPAPER, backgroundRepeat: 'repeat', backgroundSize: '360px' }}
       >
+        {/* Not WhatsApp's own E2E-encryption claim — this window is a regular
+            HTTPS web page talking to our own backend, not the WhatsApp
+            protocol, so the copy says only what's actually true here (a
+            private conversation over a secure connection). */}
+        <div className="flex justify-center mb-2">
+          <div
+            className="max-w-[90%] sm:max-w-sm flex items-start gap-1.5 px-3 py-2 rounded-lg text-[12px] leading-snug text-center"
+            style={{ backgroundColor: '#fdeef0', color: '#8a4a56' }}
+          >
+            <Lock className="w-3 h-3 mt-0.5 shrink-0" />
+            <span>Esta es una conversación privada con {data.businessName}, protegida con conexión segura.</span>
+          </div>
+        </div>
+
         {data.messages.map((m, i) => {
           const isMine = m.direction === 'INBOUND';
           const prev = data.messages[i - 1];
