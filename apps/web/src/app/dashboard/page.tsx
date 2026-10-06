@@ -19,19 +19,35 @@ export default function DashboardPage() {
   const firstName = user?.email?.split('@')[0] || 'Admin';
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const fetchOverview = () => {
     if (!tokens) return;
+    setLoading(true);
+    setError(null);
     apiGet<AnalyticsOverview>('/analytics/overview', tokens.accessToken)
       .then(setOverview)
-      .catch((err) => console.error('Error fetching dashboard analytics:', err))
+      .catch((err: any) => setError(err.message ?? 'No se pudieron cargar las métricas'))
       .finally(() => setLoading(false));
-  }, [tokens]);
+  };
 
-  if (loading || !overview) {
+  useEffect(fetchOverview, [tokens]);
+
+  if (loading) {
     return (
       <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 flex items-center justify-center min-h-[50vh]">
         <div className="animate-spin w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full" />
+      </div>
+    );
+  }
+
+  if (error || !overview) {
+    return (
+      <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 flex flex-col items-center justify-center min-h-[50vh] gap-3">
+        <p className="text-sm text-gray-500">{error ?? 'No se pudieron cargar las métricas'}</p>
+        <button onClick={fetchOverview} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold">
+          Reintentar
+        </button>
       </div>
     );
   }
