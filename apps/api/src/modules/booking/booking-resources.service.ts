@@ -56,12 +56,19 @@ export class BookingResourcesService {
   async assignService(resourceId: string, serviceId: string) {
     const resource = await this.findOne(resourceId);
 
+    // Assigning a service to a staff resource here also grants the
+    // underlying qualification (BookingServiceUser) if missing — the
+    // Resources tab has no path to the separate Services-tab qualification
+    // UI, so requiring it as a precondition left every assignment silently
+    // rejected.
     if (resource.type === 'STAFF' && resource.userId) {
       const qualified = await this.prisma.client.bookingServiceUser.findFirst({
         where: { serviceId, userId: resource.userId },
       });
       if (!qualified) {
-        throw new ValidationError('This staff member is not qualified for this service');
+        await this.prisma.client.bookingServiceUser.create({
+          data: { serviceId, userId: resource.userId },
+        });
       }
     }
 

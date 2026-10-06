@@ -9,7 +9,7 @@ describe('BookingResourcesService', () => {
     prisma = {
       client: {
         bookingResource: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
-        bookingServiceUser: { findFirst: jest.fn() },
+        bookingServiceUser: { findFirst: jest.fn(), create: jest.fn() },
         bookingResourceService: { create: jest.fn(), deleteMany: jest.fn() },
         bookingResourceSchedule: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn(), delete: jest.fn() },
       },
@@ -42,17 +42,19 @@ describe('BookingResourcesService', () => {
   });
 
   describe('assignService', () => {
-    it('rejects when a STAFF resource user is not qualified for the service', async () => {
+    it('auto-creates the qualification when a STAFF resource user lacks it, then assigns', async () => {
       prisma.client.bookingResource.findUnique.mockResolvedValue({ id: 'r1', type: 'STAFF', userId: 'u1' });
       prisma.client.bookingServiceUser.findFirst.mockResolvedValue(null);
-      await expect(service.assignService('r1', 's1')).rejects.toThrow(ValidationError);
-      expect(prisma.client.bookingResourceService.create).not.toHaveBeenCalled();
+      await service.assignService('r1', 's1');
+      expect(prisma.client.bookingServiceUser.create).toHaveBeenCalledWith({ data: { serviceId: 's1', userId: 'u1' } });
+      expect(prisma.client.bookingResourceService.create).toHaveBeenCalledWith({ data: { resourceId: 'r1', serviceId: 's1' } });
     });
 
-    it('allows assignment when the STAFF resource user is qualified', async () => {
+    it('skips re-creating the qualification when the STAFF resource user is already qualified', async () => {
       prisma.client.bookingResource.findUnique.mockResolvedValue({ id: 'r1', type: 'STAFF', userId: 'u1' });
       prisma.client.bookingServiceUser.findFirst.mockResolvedValue({ serviceId: 's1', userId: 'u1' });
       await service.assignService('r1', 's1');
+      expect(prisma.client.bookingServiceUser.create).not.toHaveBeenCalled();
       expect(prisma.client.bookingResourceService.create).toHaveBeenCalledWith({ data: { resourceId: 'r1', serviceId: 's1' } });
     });
 
