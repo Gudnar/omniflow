@@ -44,6 +44,7 @@ describe('AppointmentsService', () => {
   let eventsService: any;
   let tenantContext: any;
   let notificationsService: any;
+  let confirmationImagesService: any;
 
   beforeEach(() => {
     const bookingResourceSchedule = { findMany: jest.fn() };
@@ -82,6 +83,7 @@ describe('AppointmentsService', () => {
         bookingBlackoutDate,
         branch,
         appointmentResource: { findMany: appointmentResourceFindMany },
+        commerceSession: { findUnique: jest.fn().mockResolvedValue(null) },
         tenant: {
           findUnique: jest
             .fn()
@@ -93,7 +95,8 @@ describe('AppointmentsService', () => {
     eventsService = { emit: jest.fn() };
     tenantContext = { getTenantId: jest.fn().mockReturnValue('t1') };
     notificationsService = { create: jest.fn() };
-    service = new AppointmentsService(prisma, eventsService, tenantContext, notificationsService);
+    confirmationImagesService = { send: jest.fn() };
+    service = new AppointmentsService(prisma, eventsService, tenantContext, notificationsService, confirmationImagesService);
   });
 
   describe('getAvailability', () => {
@@ -257,6 +260,84 @@ describe('AppointmentsService', () => {
       );
     });
 
+    it('sends confirmation images when a commerceSessionId is given and the tenant has them enabled', async () => {
+      const resource = { id: 'r1', type: 'ROOM', userId: null, branchId: 'b1' };
+      prisma.client.bookingService.findMany.mockResolvedValue([{ id: 's1', durationMinutes: 60, price: '50', name: 'Corte' }]);
+      prisma.client.bookingResource.findMany.mockResolvedValue([resource]);
+      prisma.client.bookingResource.findUnique.mockResolvedValue(resource);
+      prisma.client.bookingResourceSchedule.findMany.mockResolvedValue([{ startMinute: 0, endMinute: 1440 }]);
+      prisma.client.appointmentResource.findMany.mockResolvedValue([]);
+      prisma.client.tenant.findUnique.mockResolvedValue({
+        name: 'Demo Co',
+        appointmentApprovalMode: 'AUTOMATIC',
+        notifyOnAppointmentPendingApproval: true,
+        sendAppointmentQrCode: true,
+        sendAppointmentReceiptImage: true,
+      });
+      prisma.client.commerceSession.findUnique.mockResolvedValue({ conversationId: 'conv1' });
+      tx.appointment.create.mockResolvedValue({ id: 'a1' });
+      tx.appointment.findUnique.mockResolvedValue({
+        id: 'a1',
+        contactId: 'c1',
+        contact: { name: 'Juan' },
+        branch: { name: 'Sucursal Centro' },
+        currency: 'BOB',
+        startAt: '2026-01-05T09:00:00.000Z',
+        subtotal: '50',
+        total: '50',
+        services: [{ serviceNameSnapshot: 'Corte', durationMinutesSnapshot: 60, priceSnapshot: '50' }],
+      });
+
+      await service.create({
+        contactId: 'c1',
+        branchId: 'b1',
+        serviceIds: ['s1'],
+        startAt: '2026-01-05T09:00:00.000Z',
+        commerceSessionId: 'sess1',
+      } as any);
+
+      expect(prisma.client.commerceSession.findUnique).toHaveBeenCalledWith({
+        where: { id: 'sess1' },
+        select: { conversationId: true },
+      });
+      expect(confirmationImagesService.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 't1',
+          conversationId: 'conv1',
+          sendQrCode: true,
+          sendReceiptImage: true,
+        }),
+      );
+    });
+
+    it('skips confirmation images when no commerceSessionId is given', async () => {
+      const resource = { id: 'r1', type: 'ROOM', userId: null, branchId: 'b1' };
+      prisma.client.bookingService.findMany.mockResolvedValue([{ id: 's1', durationMinutes: 60, price: '50', name: 'Corte' }]);
+      prisma.client.bookingResource.findMany.mockResolvedValue([resource]);
+      prisma.client.bookingResource.findUnique.mockResolvedValue(resource);
+      prisma.client.bookingResourceSchedule.findMany.mockResolvedValue([{ startMinute: 0, endMinute: 1440 }]);
+      prisma.client.appointmentResource.findMany.mockResolvedValue([]);
+      prisma.client.tenant.findUnique.mockResolvedValue({
+        appointmentApprovalMode: 'AUTOMATIC',
+        notifyOnAppointmentPendingApproval: true,
+        sendAppointmentQrCode: true,
+        sendAppointmentReceiptImage: true,
+      });
+      tx.appointment.create.mockResolvedValue({ id: 'a1' });
+      tx.appointment.findUnique.mockResolvedValue({
+        id: 'a1',
+        contactId: 'c1',
+        startAt: '2026-01-05T09:00:00.000Z',
+        subtotal: '50',
+        total: '50',
+        services: [],
+      });
+
+      await service.create({ contactId: 'c1', branchId: 'b1', serviceIds: ['s1'], startAt: '2026-01-05T09:00:00.000Z' } as any);
+
+      expect(confirmationImagesService.send).not.toHaveBeenCalled();
+    });
+
     it('aborts inside the transaction if the slot was taken by a concurrent booking after the pre-check', async () => {
       const resource = { id: 'r1', type: 'ROOM', userId: null, branchId: 'b1' };
       prisma.client.bookingService.findMany.mockResolvedValue([{ id: 's1', durationMinutes: 60, price: '50', name: 'Corte' }]);
@@ -339,6 +420,148 @@ describe('AppointmentsService', () => {
 
       expect(eventsService.emit).toHaveBeenCalledWith('appointment.pending_approval', expect.anything(), 'c1');
       expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('createGroup', () => {
+    const resource = { id: 'r1', type: 'ROOM', userId: null, branchId: 'b1' };
+
+    beforeEach(() => {
+      prisma.client.bookingService.findMany.mockResolvedValue([{ id: 's1', durationMinutes: 60, price: '50', name: 'Revisión' }]);
+      prisma.client.bookingResourceSchedule.findMany.mockResolvedValue([{ startMinute: 0, endMinute: 1440 }]);
+      prisma.client.appointmentResource.findMany.mockResolvedValue([]);
+    });
+
+    it('creates one sequential, back-to-back appointment per patient, sharing a groupId', async () => {
+      prisma.client.bookingResource.findMany.mockResolvedValue([resource]);
+      prisma.client.bookingResource.findUnique.mockResolvedValue(resource);
+
+      tx.appointment.create.mockResolvedValueOnce({ id: 'a1' }).mockResolvedValueOnce({ id: 'a2' });
+      tx.appointment.findUnique
+        .mockResolvedValueOnce({
+          id: 'a1',
+          contactId: 'c1',
+          patientName: 'Juan',
+          startAt: '2026-01-05T09:00:00.000Z',
+          endAt: '2026-01-05T10:00:00.000Z',
+          subtotal: '50',
+          total: '50',
+          currency: 'BOB',
+          services: [],
+        })
+        .mockResolvedValueOnce({
+          id: 'a2',
+          contactId: 'c1',
+          patientName: 'Ana',
+          startAt: '2026-01-05T10:00:00.000Z',
+          endAt: '2026-01-05T11:00:00.000Z',
+          subtotal: '50',
+          total: '50',
+          currency: 'BOB',
+          services: [],
+        });
+
+      const result = await service.createGroup({
+        contactId: 'c1',
+        branchId: 'b1',
+        startAt: '2026-01-05T09:00:00.000Z',
+        patients: [
+          { patientName: 'Juan', serviceIds: ['s1'] },
+          { patientName: 'Ana', serviceIds: ['s1'] },
+        ],
+      } as any);
+
+      expect(result).toHaveLength(2);
+      // Second patient's turn starts exactly when the first one's ends.
+      expect(tx.appointment.create).toHaveBeenNthCalledWith(2, {
+        data: expect.objectContaining({ startAt: new Date('2026-01-05T10:00:00.000Z') }),
+      });
+      const groupId1 = tx.appointment.create.mock.calls[0][0].data.groupId;
+      const groupId2 = tx.appointment.create.mock.calls[1][0].data.groupId;
+      expect(groupId1).toBeTruthy();
+      expect(groupId1).toBe(groupId2);
+      expect(tx.appointment.create.mock.calls[0][0].data.patientName).toBe('Juan');
+      expect(tx.appointment.create.mock.calls[1][0].data.patientName).toBe('Ana');
+    });
+
+    it('cancels already-created appointments when a later patient cannot be fit, and rejects', async () => {
+      // First patient finds a resource; second patient finds none.
+      prisma.client.bookingResource.findMany.mockResolvedValueOnce([resource]).mockResolvedValueOnce([]);
+      prisma.client.bookingResource.findUnique.mockResolvedValue(resource);
+      prisma.client.appointment.findUnique.mockResolvedValue({ id: 'a1', status: 'CONFIRMED', contactId: 'c1' });
+
+      tx.appointment.create.mockResolvedValueOnce({ id: 'a1' });
+      tx.appointment.findUnique.mockResolvedValueOnce({
+        id: 'a1',
+        contactId: 'c1',
+        patientName: 'Juan',
+        startAt: '2026-01-05T09:00:00.000Z',
+        endAt: '2026-01-05T10:00:00.000Z',
+        subtotal: '50',
+        total: '50',
+        currency: 'BOB',
+        services: [],
+      });
+
+      await expect(
+        service.createGroup({
+          contactId: 'c1',
+          branchId: 'b1',
+          startAt: '2026-01-05T09:00:00.000Z',
+          patients: [
+            { patientName: 'Juan', serviceIds: ['s1'] },
+            { patientName: 'Ana', serviceIds: ['s1'] },
+          ],
+        } as any),
+      ).rejects.toThrow(ValidationError);
+
+      expect(tx.appointment.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: expect.objectContaining({ status: 'CANCELLED' }),
+      });
+    });
+
+    it('sends one combined confirmation image set for the whole group, not one per patient', async () => {
+      prisma.client.bookingResource.findMany.mockResolvedValue([resource]);
+      prisma.client.bookingResource.findUnique.mockResolvedValue(resource);
+      prisma.client.tenant.findUnique.mockResolvedValue({
+        name: 'Demo Co',
+        appointmentApprovalMode: 'AUTOMATIC',
+        notifyOnAppointmentPendingApproval: true,
+        sendAppointmentQrCode: true,
+        sendAppointmentReceiptImage: true,
+      });
+      prisma.client.commerceSession.findUnique.mockResolvedValue({ conversationId: 'conv1' });
+      prisma.client.branch.findUnique.mockResolvedValue({ timezone: 'UTC', name: 'Sucursal Centro' });
+
+      tx.appointment.create.mockResolvedValueOnce({ id: 'a1' }).mockResolvedValueOnce({ id: 'a2' });
+      tx.appointment.findUnique
+        .mockResolvedValueOnce({
+          id: 'a1', contactId: 'c1', branchId: 'b1', patientName: 'Juan',
+          startAt: '2026-01-05T09:00:00.000Z', endAt: '2026-01-05T10:00:00.000Z',
+          subtotal: '50', total: '50', currency: 'BOB', services: [],
+        })
+        .mockResolvedValueOnce({
+          id: 'a2', contactId: 'c1', branchId: 'b1', patientName: 'Ana',
+          startAt: '2026-01-05T10:00:00.000Z', endAt: '2026-01-05T11:00:00.000Z',
+          subtotal: '50', total: '50', currency: 'BOB', services: [],
+        });
+
+      await service.createGroup({
+        contactId: 'c1',
+        branchId: 'b1',
+        startAt: '2026-01-05T09:00:00.000Z',
+        commerceSessionId: 'sess1',
+        patients: [
+          { patientName: 'Juan', serviceIds: ['s1'] },
+          { patientName: 'Ana', serviceIds: ['s1'] },
+        ],
+      } as any);
+
+      expect(confirmationImagesService.send).toHaveBeenCalledTimes(1);
+      expect(confirmationImagesService.send).toHaveBeenCalledWith(
+        expect.objectContaining({ conversationId: 'conv1', sendQrCode: true, sendReceiptImage: true }),
+      );
     });
   });
 
@@ -444,6 +667,24 @@ describe('AppointmentsService', () => {
         eventByStatus[to],
         { appointmentId: 'a1', fromStatus: from, toStatus: to },
         'c1',
+      );
+    });
+  });
+
+  describe('list', () => {
+    it('filters by groupId and orders earliest-first for a group booking', async () => {
+      prisma.client.appointment.findMany.mockResolvedValue([]);
+      await service.list({ groupId: 'g1' } as any);
+      expect(prisma.client.appointment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { groupId: 'g1' }, orderBy: { startAt: 'asc' } }),
+      );
+    });
+
+    it('defaults to newest-first when not filtering by groupId', async () => {
+      prisma.client.appointment.findMany.mockResolvedValue([]);
+      await service.list({} as any);
+      expect(prisma.client.appointment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: {}, orderBy: { startAt: 'desc' } }),
       );
     });
   });

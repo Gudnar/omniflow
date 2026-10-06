@@ -12,6 +12,7 @@ describe('AiReplyService', () => {
   let knowledgeSearchService: any;
   let contactCommerceService: any;
   let aiCredentialsService: any;
+  let aiToolsService: any;
 
   const openAgent = (overrides: any = {}) => ({
     id: 'agent-1',
@@ -36,7 +37,7 @@ describe('AiReplyService', () => {
       },
     };
     tenantContext = { setContext: jest.fn() };
-    messagesService = { create: jest.fn() };
+    messagesService = { create: jest.fn(), sendQuickReplies: jest.fn(), sendForm: jest.fn() };
     openAiAdapter = { complete: jest.fn() };
     anthropicAdapter = { complete: jest.fn() };
     geminiAdapter = { complete: jest.fn() };
@@ -44,6 +45,7 @@ describe('AiReplyService', () => {
     knowledgeSearchService = { search: jest.fn().mockResolvedValue([]) };
     contactCommerceService = { generateStorefrontLink: jest.fn() };
     aiCredentialsService = { getDecrypted: jest.fn().mockResolvedValue('sk-test') };
+    aiToolsService = { execute: jest.fn() };
     service = new AiReplyService(
       prisma,
       tenantContext,
@@ -55,6 +57,7 @@ describe('AiReplyService', () => {
       knowledgeSearchService,
       contactCommerceService,
       aiCredentialsService,
+      aiToolsService,
     );
   });
 
@@ -277,7 +280,7 @@ describe('AiReplyService', () => {
         direction: 'OUTBOUND',
         type: 'CTA',
         content: 'Mirá nuestro catálogo\n\nhttp://localhost:3000/tienda/demo?s=abc123',
-        ctaPayload: { action: 'STORE', url: 'http://localhost:3000/tienda/demo?s=abc123' },
+        ctaPayload: { action: 'STORE', url: 'http://localhost:3000/tienda/demo?s=abc123', label: 'Ir a la tienda' },
       });
       expect(prisma.client.aiUsage.create).toHaveBeenCalledWith({
         data: { agentId: 'agent-1', conversationId: 'conv1', promptTokens: 30, completionTokens: 5, totalTokens: 35 },
@@ -303,7 +306,7 @@ describe('AiReplyService', () => {
         direction: 'OUTBOUND',
         type: 'CTA',
         content: 'Elegí un horario\n\nhttp://localhost:3000/tienda/demo/reservas?s=abc123',
-        ctaPayload: { action: 'BOOKING', url: 'http://localhost:3000/tienda/demo/reservas?s=abc123' },
+        ctaPayload: { action: 'BOOKING', url: 'http://localhost:3000/tienda/demo/reservas?s=abc123', label: 'Reservar cita' },
       });
     });
 
@@ -324,6 +327,206 @@ describe('AiReplyService', () => {
       expect(contactCommerceService.generateStorefrontLink).not.toHaveBeenCalled();
       expect(messagesService.create).not.toHaveBeenCalled();
       expect(prisma.client.aiUsage.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('send_quick_replies / send_form tools', () => {
+    const baseConversation = { id: 'conv1', assignedToId: null, status: 'OPEN', channel: 'WEBCHAT', contactId: 'contact-1' };
+
+    it('sends quick replies when the tool is enabled for the agent', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: ['send_quick_replies'] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'quiero comprar' });
+      openAiAdapter.complete.mockResolvedValue({
+        content: '',
+        promptTokens: 10,
+        completionTokens: 4,
+        toolCalls: [{ name: 'send_quick_replies', arguments: JSON.stringify({ message: '¿Retiro o envío?', options: ['Retiro', 'Envío'] }) }],
+      });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(messagesService.sendQuickReplies).toHaveBeenCalledWith('conv1', 'agent-1', {
+        message: '¿Retiro o envío?',
+        options: ['Retiro', 'Envío'],
+      });
+      expect(prisma.client.aiUsage.create).toHaveBeenCalledWith({
+        data: { agentId: 'agent-1', conversationId: 'conv1', promptTokens: 10, completionTokens: 4, totalTokens: 14 },
+      });
+    });
+
+    it('rejects send_quick_replies when the tool is not enabled for the agent', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: [] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'quiero comprar' });
+      openAiAdapter.complete.mockResolvedValue({
+        content: '',
+        promptTokens: 10,
+        completionTokens: 4,
+        toolCalls: [{ name: 'send_quick_replies', arguments: JSON.stringify({ message: '¿Retiro o envío?', options: ['Retiro', 'Envío'] }) }],
+      });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(messagesService.sendQuickReplies).not.toHaveBeenCalled();
+    });
+
+    it('rejects send_quick_replies with fewer than 2 or more than 3 options', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: ['send_quick_replies'] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'hola' });
+      openAiAdapter.complete.mockResolvedValue({
+        content: '',
+        promptTokens: 10,
+        completionTokens: 4,
+        toolCalls: [{ name: 'send_quick_replies', arguments: JSON.stringify({ message: 'Elegí', options: ['Solo una'] }) }],
+      });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(messagesService.sendQuickReplies).not.toHaveBeenCalled();
+    });
+
+    it('sends a form when the channel is WEBCHAT and the tool is enabled', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: ['send_form'] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'quiero una cita' });
+      openAiAdapter.complete.mockResolvedValue({
+        content: '',
+        promptTokens: 10,
+        completionTokens: 4,
+        toolCalls: [{
+          name: 'send_form',
+          arguments: JSON.stringify({ message: 'Completa tus datos', fields: [{ label: 'Nombre', fieldType: 'text' }] }),
+        }],
+      });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(messagesService.sendForm).toHaveBeenCalledWith('conv1', 'agent-1', {
+        message: 'Completa tus datos',
+        fields: [{ label: 'Nombre', fieldType: 'text' }],
+        submitLabel: undefined,
+      });
+    });
+
+    it('rejects send_form on a non-WEBCHAT conversation, even if the tool is enabled', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue({ ...baseConversation, channel: 'WHATSAPP' });
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: ['send_form'] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'quiero una cita' });
+      openAiAdapter.complete.mockResolvedValue({
+        content: '',
+        promptTokens: 10,
+        completionTokens: 4,
+        toolCalls: [{
+          name: 'send_form',
+          arguments: JSON.stringify({ message: 'Completa tus datos', fields: [{ label: 'Nombre', fieldType: 'text' }] }),
+        }],
+      });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(messagesService.sendForm).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Phase 14: ecommerce/booking data tools', () => {
+    const baseConversation = { id: 'conv1', assignedToId: null, status: 'OPEN', channel: 'WHATSAPP', contactId: 'contact-1' };
+
+    it("only offers the agent's enabledTools to the model, in the canonical LlmTool shape", async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: ['check_stock'] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'hola' });
+      openAiAdapter.complete.mockResolvedValue({ content: 'Hola', promptTokens: 5, completionTokens: 2 });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      const [[callArgs]] = openAiAdapter.complete.mock.calls;
+      expect(callArgs.tools).toEqual([expect.objectContaining({ name: 'check_stock' })]);
+    });
+
+    it('executes a requested tool, feeds the JSON result back as a tool message, and sends the final reply', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: ['check_stock'] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: '¿hay stock?' });
+      openAiAdapter.complete
+        .mockResolvedValueOnce({
+          content: '',
+          promptTokens: 10,
+          completionTokens: 5,
+          toolCalls: [{ id: 'call_1', name: 'check_stock', arguments: '{"variantId":"v1"}' }],
+        })
+        .mockResolvedValueOnce({ content: 'Sí, tenemos 3 en stock.', promptTokens: 20, completionTokens: 8 });
+      aiToolsService.execute.mockResolvedValue({ ok: true, data: { available: true, stock: 3 } });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(aiToolsService.execute).toHaveBeenCalledWith('check_stock', '{"variantId":"v1"}', {
+        tenantId: 't1',
+        contactId: 'contact-1',
+        conversationId: 'conv1',
+        agentId: 'agent-1',
+      });
+
+      const [, secondCallArgs] = openAiAdapter.complete.mock.calls;
+      const toolMessage = secondCallArgs[0].messages.find((m: any) => m.role === 'tool');
+      expect(toolMessage).toEqual({
+        role: 'tool',
+        toolCallId: 'call_1',
+        toolName: 'check_stock',
+        content: JSON.stringify({ ok: true, data: { available: true, stock: 3 } }),
+      });
+
+      expect(messagesService.create).toHaveBeenCalledWith('conv1', 'agent-1', {
+        direction: 'OUTBOUND',
+        type: 'TEXT',
+        content: 'Sí, tenemos 3 en stock.',
+      });
+      // Usage accumulates across both LLM calls in the loop.
+      expect(prisma.client.aiUsage.create).toHaveBeenCalledWith({
+        data: { agentId: 'agent-1', conversationId: 'conv1', promptTokens: 30, completionTokens: 13, totalTokens: 43 },
+      });
+    });
+
+    it('rejects and never executes a tool call for a tool not in enabledTools, even if the model calls it anyway', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: ['check_stock'] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'cancela mi pedido' });
+      openAiAdapter.complete
+        .mockResolvedValueOnce({
+          content: '',
+          promptTokens: 10,
+          completionTokens: 5,
+          toolCalls: [{ id: 'call_1', name: 'cancel_order', arguments: '{"orderNumber":"ORD-1"}' }],
+        })
+        .mockResolvedValueOnce({ content: 'No puedo hacer eso.', promptTokens: 15, completionTokens: 6 });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(aiToolsService.execute).not.toHaveBeenCalled();
+      const [, secondCallArgs] = openAiAdapter.complete.mock.calls;
+      const toolMessage = secondCallArgs[0].messages.find((m: any) => m.role === 'tool');
+      expect(JSON.parse(toolMessage.content)).toEqual({ ok: false, error: 'This tool is not enabled for this agent.' });
+    });
+
+    it('stops after MAX_TOOL_ITERATIONS and sends nothing if the model never stops calling tools', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: ['check_stock'] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: '¿hay stock?' });
+      openAiAdapter.complete.mockResolvedValue({
+        content: '',
+        promptTokens: 1,
+        completionTokens: 1,
+        toolCalls: [{ id: 'call_x', name: 'check_stock', arguments: '{}' }],
+      });
+      aiToolsService.execute.mockResolvedValue({ ok: true, data: {} });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      // One initial call, then up to MAX_TOOL_ITERATIONS (6) more while the
+      // model keeps calling tools.
+      expect(openAiAdapter.complete).toHaveBeenCalledTimes(7);
+      expect(messagesService.create).not.toHaveBeenCalled();
     });
   });
 });

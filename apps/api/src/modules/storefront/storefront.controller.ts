@@ -7,7 +7,7 @@ import { BookingStorefrontService } from './booking-storefront.service';
 import { AddCartItemDto, UpdateCartItemDto, CheckoutDto } from '../commerce/dto/cart.dto';
 import { SessionLocationDto } from '../commerce/dto/commerce-session.dto';
 import { CreateAddressDto } from '../commerce/dto/address.dto';
-import { PublicAvailabilityQueryDto, PublicBookAppointmentDto } from './dto/public-booking.dto';
+import { PublicAvailabilityQueryDto, PublicBookAppointmentDto, PublicBookAppointmentGroupDto } from './dto/public-booking.dto';
 
 /**
  * Public, unauthenticated storefront surface — a customer's browser reaches
@@ -123,6 +123,11 @@ export class StorefrontController {
   @Post('sessions/:token/booking/appointments')
   bookAppointment(@Param('token') token: string, @Body() dto: PublicBookAppointmentDto) {
     return this.bookingStorefrontService.bookAppointment(token, dto);
+  }
+
+  @Post('sessions/:token/booking/appointments/group')
+  bookAppointmentGroup(@Param('token') token: string, @Body() dto: PublicBookAppointmentGroupDto) {
+    return this.bookingStorefrontService.bookAppointmentGroup(token, dto);
   }
 
   @Get('sessions/:token/purchases')

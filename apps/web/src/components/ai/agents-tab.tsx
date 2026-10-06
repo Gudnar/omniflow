@@ -1,12 +1,24 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Pencil, Trash2, Bot, BookOpen } from 'lucide-react';
+import { Plus, Pencil, Trash2, Bot, BookOpen, Wrench } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api-client';
 import { Modal } from '@/components/ui/modal';
-import type { AiAgent, AiModel, BackendChannel, KnowledgeDocument } from '@/lib/types';
+import type { AiAgent, AiModel, BackendChannel, KnowledgeDocument, AiTool, AiToolRiskLevel } from '@/lib/types';
+
+const RISK_LABELS: Record<AiToolRiskLevel, string> = {
+  read: 'Solo consulta',
+  write: 'Modifica datos',
+  critical: 'Finaliza algo real',
+};
+
+const RISK_STYLES: Record<AiToolRiskLevel, string> = {
+  read: 'bg-gray-100 text-gray-600',
+  write: 'bg-blue-50 text-blue-700',
+  critical: 'bg-amber-50 text-amber-700',
+};
 
 const CHANNEL_LABELS: Record<BackendChannel, string> = {
   WHATSAPP: 'WhatsApp',
@@ -33,6 +45,7 @@ function emptyForm() {
     escalationKeywords: '',
     maxTokens: 500,
     knowledgeDocumentIds: [] as string[],
+    enabledTools: [] as string[],
   };
 }
 
@@ -42,6 +55,7 @@ export function AgentsTab() {
   const [agents, setAgents] = useState<AiAgent[]>([]);
   const [models, setModels] = useState<AiModel[]>([]);
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
+  const [tools, setTools] = useState<AiTool[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,6 +69,7 @@ export function AgentsTab() {
       refetch(),
       apiGet<AiModel[]>('/ai/models', tokens.accessToken).then(setModels),
       apiGet<KnowledgeDocument[]>('/knowledge/documents', tokens.accessToken).then(setDocuments),
+      apiGet<AiTool[]>('/ai/tools', tokens.accessToken).then(setTools),
     ])
       .catch((err) => console.error('Error fetching AI agents:', err))
       .finally(() => setLoading(false));
@@ -79,6 +94,7 @@ export function AgentsTab() {
       escalationKeywords: agent.escalationKeywords.join(', '),
       maxTokens: agent.maxTokens,
       knowledgeDocumentIds: agent.knowledgeDocuments.map((k) => k.document.id),
+      enabledTools: agent.enabledTools,
     });
     setShowModal(true);
   };
@@ -96,6 +112,13 @@ export function AgentsTab() {
       knowledgeDocumentIds: f.knowledgeDocumentIds.includes(documentId)
         ? f.knowledgeDocumentIds.filter((id) => id !== documentId)
         : [...f.knowledgeDocumentIds, documentId],
+    }));
+  };
+
+  const toggleTool = (toolName: string) => {
+    setForm((f) => ({
+      ...f,
+      enabledTools: f.enabledTools.includes(toolName) ? f.enabledTools.filter((t) => t !== toolName) : [...f.enabledTools, toolName],
     }));
   };
 
@@ -125,6 +148,7 @@ export function AgentsTab() {
           .filter(Boolean),
         maxTokens: form.maxTokens,
         knowledgeDocumentIds: form.knowledgeDocumentIds,
+        enabledTools: form.enabledTools,
       };
       if (form.id) {
         await apiPatch(`/ai/agents/${form.id}`, tokens?.accessToken, payload);
@@ -217,10 +241,18 @@ export function AgentsTab() {
               </div>
 
               {agent.knowledgeDocuments.length > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
                   <BookOpen className="w-3.5 h-3.5" />
                   {agent.knowledgeDocuments.length} documento{agent.knowledgeDocuments.length === 1 ? '' : 's'} de
                   conocimiento
+                </div>
+              )}
+
+              {agent.enabledTools.length > 0 && (
+                <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-3">
+                  <Wrench className="w-3.5 h-3.5" />
+                  {agent.enabledTools.length} herramienta{agent.enabledTools.length === 1 ? '' : 's'} habilitada
+                  {agent.enabledTools.length === 1 ? '' : 's'}
                 </div>
               )}
 
@@ -365,6 +397,42 @@ export function AgentsTab() {
             <p className="text-xs text-gray-400 mt-1">
               El agente solo consultará los documentos que marques aquí, y solo si están activos.
             </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1.5 flex items-center gap-1.5">
+              <Wrench className="w-3.5 h-3.5 text-gray-400" /> Herramientas
+            </label>
+            <p className="text-xs text-gray-400 mb-2">
+              Lo que el agente puede hacer por sí solo durante la conversación: consultar el catálogo, armar el
+              carrito, reservar citas, y — si las marcas — finalizar compras o reservas reales sin intervención
+              humana. Lo que un negocio permite configurado en Confirmación/Aprobación sigue aplicando igual.
+            </p>
+            {tools.length === 0 ? (
+              <p className="text-xs text-gray-400">Cargando herramientas disponibles…</p>
+            ) : (
+              <div className="space-y-1.5 max-h-56 overflow-y-auto border border-gray-200 rounded-lg p-2">
+                {tools.map((tool) => (
+                  <label key={tool.name} className="flex items-start gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={form.enabledTools.includes(tool.name)}
+                      onChange={() => toggleTool(tool.name)}
+                    />
+                    <span className="flex-1">
+                      <span className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono text-xs">{tool.name}</span>
+                        <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${RISK_STYLES[tool.riskLevel]}`}>
+                          {RISK_LABELS[tool.riskLevel]}
+                        </span>
+                      </span>
+                      <span className="block text-xs text-gray-400 mt-0.5">{tool.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>

@@ -100,6 +100,34 @@ describe('GeminiAdapter', () => {
     expect(body.tools).toEqual([
       { functionDeclarations: [{ name: 'send_storefront_link', description: 'Envía un enlace real', parameters: { type: 'object', properties: {} } }] },
     ]);
-    expect(result.toolCalls).toEqual([{ name: 'send_storefront_link', arguments: '{"action":"STORE"}' }]);
+    expect(result.toolCalls).toEqual([{ id: 'call_0', name: 'send_storefront_link', arguments: '{"action":"STORE"}' }]);
+  });
+
+  it('translates an assistant tool-call turn into a functionCall part and its result into a functionResponse part', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({ candidates: [{ content: { parts: [{ text: 'Tenemos 3 en stock.' }] } }], usageMetadata: {} }),
+    }) as any;
+
+    await adapter.complete({
+      apiKey: 'gem-test',
+      model: 'gemini-2.0-flash',
+      messages: [
+        { role: 'user', content: '¿hay stock?' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'check_stock', arguments: '{"productId":"p1"}' }] },
+        { role: 'tool', toolCallId: 'call_1', toolName: 'check_stock', content: '{"stock":3}' },
+      ],
+      temperature: 0.7,
+      maxTokens: 500,
+    });
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.contents).toEqual([
+      { role: 'user', parts: [{ text: '¿hay stock?' }] },
+      { role: 'model', parts: [{ functionCall: { name: 'check_stock', args: { productId: 'p1' } } }] },
+      { role: 'function', parts: [{ functionResponse: { name: 'check_stock', response: { result: '{"stock":3}' } } }] },
+    ]);
   });
 });

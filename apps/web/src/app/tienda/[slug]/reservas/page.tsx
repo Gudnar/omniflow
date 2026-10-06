@@ -2,14 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Loader2, Menu, CalendarDays, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, Clock, Loader2, Menu, CalendarDays, ShoppingBag, Plus, X, Users } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api-client';
 import { useToast } from '@/lib/toast-context';
 import type { EcommerceStore, StorefrontSession, StorefrontBookingService, AvailabilitySlot, Appointment } from '@/lib/types';
 import { waMeLink, tint, earliestBookableDateStr, WEEKDAY_LABELS, MONTH_LABELS } from '../shared';
 import { StorefrontInfoSheet } from '../info-sheet';
 
-type View = 'services' | 'calendar' | 'slots' | 'confirm' | 'success';
+type View = 'services' | 'patients' | 'calendar' | 'slots' | 'confirm' | 'success';
 
 type BookingConfig = { minBookingLeadDays: number; timezone: string; dates: string[] };
 
@@ -53,7 +53,10 @@ export default function BookingStorefrontPage() {
   const [availableSlots, setAvailableSlots] = useState<AvailabilitySlot[] | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
-  const [completedAppointment, setCompletedAppointment] = useState<Appointment | null>(null);
+  const [completedAppointments, setCompletedAppointments] = useState<Appointment[] | null>(null);
+  // One empty slot = "just for me" (no label needed); 2+ requires a name
+  // each, since each becomes its own back-to-back turn for a different person.
+  const [patientNames, setPatientNames] = useState<string[]>(['']);
 
   useEffect(() => {
     // No token: a visitor browsing services (e.g. from the public Página de
@@ -86,7 +89,8 @@ export default function BookingStorefrontPage() {
     setSelectedDate(null);
     setAvailableSlots(null);
     setSelectedSlot(null);
-    setView('calendar');
+    setPatientNames(['']);
+    setView('patients');
     if (!bookingConfig) {
       try {
         const config = await apiGet<BookingConfig>(`/storefront/sessions/${token}/booking/blackout-dates`);
@@ -96,6 +100,10 @@ export default function BookingStorefrontPage() {
       }
     }
   };
+
+  // Blank names are only valid when there's a single one ("just for me").
+  // Two or more require a name each, since each becomes its own real turn.
+  const patientsValid = patientNames.length === 1 || patientNames.every((n) => n.trim().length > 0);
 
   const selectCalendarDate = async (dateStr: string) => {
     if (!selectedService) return;
@@ -117,13 +125,22 @@ export default function BookingStorefrontPage() {
 
   const confirmBooking = async () => {
     if (!selectedService || !selectedSlot) return;
+    const names = patientNames.map((n) => n.trim()).filter(Boolean);
     setBusy(true);
     try {
-      const appointment = await apiPost<Appointment>(`/storefront/sessions/${token}/booking/appointments`, undefined, {
-        serviceId: selectedService.id,
-        startAt: selectedSlot.startAt,
-      });
-      setCompletedAppointment(appointment);
+      if (names.length > 1) {
+        const appointments = await apiPost<Appointment[]>(`/storefront/sessions/${token}/booking/appointments/group`, undefined, {
+          startAt: selectedSlot.startAt,
+          patients: names.map((patientName) => ({ patientName, serviceId: selectedService.id })),
+        });
+        setCompletedAppointments(appointments);
+      } else {
+        const appointment = await apiPost<Appointment>(`/storefront/sessions/${token}/booking/appointments`, undefined, {
+          serviceId: selectedService.id,
+          startAt: selectedSlot.startAt,
+        });
+        setCompletedAppointments([appointment]);
+      }
       setView('success');
     } catch (err: any) {
       toast.error(err.message ?? 'No se pudo confirmar la reserva');
@@ -269,6 +286,66 @@ export default function BookingStorefrontPage() {
         </main>
       )}
 
+      {view === 'patients' && selectedService && (
+        <main className="max-w-lg mx-auto px-4 sm:px-8 py-6">
+          <button onClick={() => setView('services')} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 mb-5">
+            <ArrowLeft className="w-4 h-4" /> Volver a servicios
+          </button>
+
+          <div className="bg-white rounded-3xl shadow-sm p-5 mb-4">
+            <h2 className="font-extrabold text-xl tracking-tight">{selectedService.name}</h2>
+            <p className="text-sm text-gray-400 mt-1">{selectedService.durationMinutes} min · Bs. {selectedService.price.toFixed(2)} por persona</p>
+          </div>
+
+          <div className="bg-white rounded-3xl shadow-sm p-5">
+            <h3 className="font-bold text-base mb-1 flex items-center gap-2">
+              <Users className="w-4 h-4 text-gray-400" /> ¿Para quién es la reserva?
+            </h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Si reservas para más de una persona, cada una recibe su propio turno, uno justo después del otro.
+            </p>
+
+            <div className="space-y-2.5 mb-3">
+              {patientNames.map((name, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={name}
+                    onChange={(e) => setPatientNames((prev) => prev.map((n, idx) => (idx === i ? e.target.value : n)))}
+                    placeholder={i === 0 && patientNames.length === 1 ? 'Nombre (opcional, si es solo para ti)' : `Nombre de la persona ${i + 1}`}
+                    className="flex-1 px-3.5 py-2.5 border border-gray-200 rounded-xl text-sm"
+                  />
+                  {patientNames.length > 1 && (
+                    <button
+                      onClick={() => setPatientNames((prev) => prev.filter((_, idx) => idx !== i))}
+                      className="p-2 text-gray-400 hover:text-red-500 shrink-0"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setPatientNames((prev) => [...prev, ''])}
+              className="flex items-center gap-1.5 text-sm font-semibold mb-5"
+              style={{ color: settings.buttonColor }}
+            >
+              <Plus className="w-4 h-4" /> Agregar otra persona
+            </button>
+
+            <button
+              onClick={() => setView('calendar')}
+              disabled={!patientsValid}
+              className="w-full py-3.5 rounded-2xl text-white font-extrabold text-[15px] shadow-sm disabled:opacity-50"
+              style={{ backgroundColor: settings.buttonColor }}
+            >
+              Continuar
+            </button>
+          </div>
+        </main>
+      )}
+
       {view === 'calendar' && selectedService && (
         <BookingCalendarView
           service={selectedService}
@@ -277,7 +354,7 @@ export default function BookingStorefrontPage() {
           setCalendarMonth={setCalendarMonth}
           onSelectDate={selectCalendarDate}
           buttonColor={settings.buttonColor}
-          onBack={() => setView('services')}
+          onBack={() => setView('patients')}
         />
       )}
 
@@ -331,56 +408,90 @@ export default function BookingStorefrontPage() {
         </main>
       )}
 
-      {view === 'confirm' && selectedService && selectedSlot && (
-        <main className="max-w-lg mx-auto px-4 sm:px-8 py-6">
-          <button onClick={() => setView('slots')} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 mb-5">
-            <ArrowLeft className="w-4 h-4" /> Elegir otro horario
-          </button>
-          <h2 className="font-extrabold text-2xl mb-4 tracking-tight">Confirmar reserva</h2>
+      {view === 'confirm' && selectedService && selectedSlot && (() => {
+        const names = patientNames.map((n) => n.trim()).filter(Boolean);
+        const isGroup = names.length > 1;
+        return (
+          <main className="max-w-lg mx-auto px-4 sm:px-8 py-6">
+            <button onClick={() => setView('slots')} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 mb-5">
+              <ArrowLeft className="w-4 h-4" /> Elegir otro horario
+            </button>
+            <h2 className="font-extrabold text-2xl mb-4 tracking-tight">Confirmar reserva</h2>
 
-          <div className="bg-white rounded-3xl shadow-sm p-5 mb-6 divide-y divide-gray-100">
-            <div className="flex justify-between items-center pb-3">
-              <span className="text-sm text-gray-400">Servicio</span>
-              <span className="font-bold text-sm text-right">{selectedService.name}</span>
+            <div className="bg-white rounded-3xl shadow-sm p-5 mb-6 divide-y divide-gray-100">
+              <div className="flex justify-between items-center pb-3">
+                <span className="text-sm text-gray-400">Servicio</span>
+                <span className="font-bold text-sm text-right">{selectedService.name}</span>
+              </div>
+              <div className="flex justify-between items-center py-3">
+                <span className="text-sm text-gray-400">Fecha</span>
+                <span className="font-bold text-sm text-right">
+                  {formatSlotDate(selectedSlot.startAt, bookingConfig!.timezone)}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-3">
+                <span className="text-sm text-gray-400">{isGroup ? 'Primer turno' : 'Hora'}</span>
+                <span className="font-bold text-sm">{formatSlotTime(selectedSlot.startAt, bookingConfig!.timezone)}</span>
+              </div>
+              {isGroup && (
+                <div className="py-3">
+                  <span className="text-sm text-gray-400 block mb-2">Personas ({names.length})</span>
+                  <div className="space-y-1">
+                    {names.map((name, i) => (
+                      <p key={i} className="text-sm font-semibold">{i + 1}. {name}</p>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Cada persona recibe un turno consecutivo a partir de la hora de arriba — te confirmamos el horario exacto de cada una al reservar.
+                  </p>
+                </div>
+              )}
+              <div className="flex justify-between items-center pt-3">
+                <span className="font-extrabold text-base">Total</span>
+                <span className="font-extrabold text-base">
+                  Bs. {(selectedService.price * (isGroup ? names.length : 1)).toFixed(2)}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between items-center py-3">
-              <span className="text-sm text-gray-400">Fecha</span>
-              <span className="font-bold text-sm text-right">
-                {formatSlotDate(selectedSlot.startAt, bookingConfig!.timezone)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center py-3">
-              <span className="text-sm text-gray-400">Hora</span>
-              <span className="font-bold text-sm">{formatSlotTime(selectedSlot.startAt, bookingConfig!.timezone)}</span>
-            </div>
-            <div className="flex justify-between items-center pt-3">
-              <span className="font-extrabold text-base">Total</span>
-              <span className="font-extrabold text-base">Bs. {selectedService.price.toFixed(2)}</span>
-            </div>
-          </div>
 
-          <button
-            onClick={confirmBooking}
-            disabled={busy}
-            className="w-full py-4 rounded-2xl text-white font-extrabold text-[15px] shadow-sm disabled:opacity-50"
-            style={{ backgroundColor: settings.buttonColor }}
-          >
-            {busy ? 'Confirmando...' : 'Confirmar reserva'}
-          </button>
-        </main>
-      )}
+            <button
+              onClick={confirmBooking}
+              disabled={busy}
+              className="w-full py-4 rounded-2xl text-white font-extrabold text-[15px] shadow-sm disabled:opacity-50"
+              style={{ backgroundColor: settings.buttonColor }}
+            >
+              {busy ? 'Confirmando...' : 'Confirmar reserva'}
+            </button>
+          </main>
+        );
+      })()}
 
-      {view === 'success' && completedAppointment && (
+      {view === 'success' && completedAppointments && completedAppointments.length > 0 && (
         <main className="max-w-md mx-auto px-4 sm:px-8 py-16 text-center">
           <div className="bg-white rounded-3xl shadow-sm p-8">
             <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8" strokeWidth={2.5} />
             </div>
-            <h2 className="font-extrabold text-xl mb-1 tracking-tight">¡Reserva confirmada!</h2>
-            <p className="text-sm text-gray-400 mb-6 capitalize">
-              {formatSlotDate(completedAppointment.startAt, bookingConfig!.timezone)} ·{' '}
-              {formatSlotTime(completedAppointment.startAt, bookingConfig!.timezone)}
-            </p>
+            <h2 className="font-extrabold text-xl mb-1 tracking-tight">
+              {completedAppointments.length > 1 ? '¡Reservas confirmadas!' : '¡Reserva confirmada!'}
+            </h2>
+
+            {completedAppointments.length === 1 ? (
+              <p className="text-sm text-gray-400 mb-6 capitalize">
+                {formatSlotDate(completedAppointments[0].startAt, bookingConfig!.timezone)} ·{' '}
+                {formatSlotTime(completedAppointments[0].startAt, bookingConfig!.timezone)}
+              </p>
+            ) : (
+              <div className="text-left mb-6 mt-4 space-y-2">
+                {completedAppointments.map((a) => (
+                  <div key={a.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-xl px-3.5 py-2.5">
+                    <span className="font-semibold">{a.patientName}</span>
+                    <span className="text-gray-500">{formatSlotTime(a.startAt, bookingConfig!.timezone)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {session?.returnConversationUrl ? (
               <a
                 href={session.returnConversationUrl}
@@ -391,7 +502,7 @@ export default function BookingStorefrontPage() {
               </a>
             ) : store.whatsappPhone ? (
               <a
-                href={waMeLink(store.whatsappPhone, `Ya confirmé mi reserva del ${completedAppointment.startAt}`)}
+                href={waMeLink(store.whatsappPhone, `Ya confirmé mi reserva del ${completedAppointments[0].startAt}`)}
                 className="inline-block w-full py-3.5 rounded-2xl text-white font-extrabold"
                 style={{ backgroundColor: '#25D366' }}
               >
@@ -445,7 +556,7 @@ function BookingCalendarView({
   return (
     <main className="max-w-lg mx-auto px-4 sm:px-8 py-6">
       <button onClick={onBack} className="flex items-center gap-1.5 text-sm font-semibold text-gray-500 mb-5">
-        <ArrowLeft className="w-4 h-4" /> Volver a servicios
+        <ArrowLeft className="w-4 h-4" /> Volver
       </button>
 
       <div className="bg-white rounded-3xl shadow-sm p-5 mb-4">

@@ -580,6 +580,28 @@ export default function StorefrontPage() {
             ))}
           </div>
 
+          {fulfillmentType === 'PICKUP' && (() => {
+            const flagged = (cart?.items ?? []).filter((item) => item.product.requiresPreparation);
+            if (!flagged.length) return null;
+            const maxMinutes = Math.max(0, ...flagged.map((item) => item.product.preparationMinutes ?? 0));
+            return (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 mb-6">
+                <p className="text-sm font-semibold text-amber-800 mb-1">Algunos productos necesitan preparación</p>
+                <ul className="space-y-0.5 mb-1">
+                  {flagged.map((item) => (
+                    <li key={item.id} className="text-xs text-amber-700">
+                      {item.product.name}
+                      {item.product.preparationReason ? ` — ${item.product.preparationReason}` : ''}
+                    </li>
+                  ))}
+                </ul>
+                {maxMinutes > 0 && (
+                  <p className="text-xs text-amber-700">Estará listo para recoger en aprox. {maxMinutes} min.</p>
+                )}
+              </div>
+            );
+          })()}
+
           {fulfillmentType !== 'PICKUP' && (
             <div className="space-y-3 mb-6">
               <div className="flex items-center gap-2 flex-wrap">

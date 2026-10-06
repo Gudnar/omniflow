@@ -1,5 +1,6 @@
 import { IsArray, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from 'class-validator';
 import { Channel, AiAgentStatus } from '@omniflow/database';
+import { ALL_TOOL_NAMES } from '../tools/registry';
 
 export class CreateAiAgentDto {
   @IsString()
@@ -50,6 +51,11 @@ export class CreateAiAgentDto {
   @IsString({ each: true })
   @IsOptional()
   declare knowledgeDocumentIds?: string[];
+
+  @IsArray()
+  @IsIn(ALL_TOOL_NAMES, { each: true })
+  @IsOptional()
+  declare enabledTools?: string[];
 }
 
 export class UpdateAiAgentDto {
@@ -104,4 +110,9 @@ export class UpdateAiAgentDto {
   @IsString({ each: true })
   @IsOptional()
   declare knowledgeDocumentIds?: string[];
+
+  @IsArray()
+  @IsIn(ALL_TOOL_NAMES, { each: true })
+  @IsOptional()
+  declare enabledTools?: string[];
 }

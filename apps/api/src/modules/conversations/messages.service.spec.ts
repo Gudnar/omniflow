@@ -316,4 +316,83 @@ describe('MessagesService', () => {
       expect(queueService.enqueueChannelOutboundMessage).not.toHaveBeenCalled();
     });
   });
+
+  describe('sendQuickReplies', () => {
+    it('builds an INTERACTIVE message with one option id per option, in order', async () => {
+      tx.message.create.mockResolvedValue({ id: 'msg1' });
+      tx.message.findUnique.mockResolvedValue({ id: 'msg1' });
+
+      await service.sendQuickReplies('conv1', 'agent-1', { message: '¿Retiro o envío?', options: ['Retiro', 'Envío'] });
+
+      expect(tx.message.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          type: 'INTERACTIVE',
+          content: '¿Retiro o envío?',
+          interactivePayload: {
+            kind: 'quick_replies',
+            message: '¿Retiro o envío?',
+            options: [
+              { id: 'opt_0', label: 'Retiro' },
+              { id: 'opt_1', label: 'Envío' },
+            ],
+          },
+        }),
+      });
+    });
+  });
+
+  describe('sendForm', () => {
+    it('rejects sending a form on a non-WEBCHAT conversation', async () => {
+      conversationsService.findOne.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1', contactId: 'contact-1', channel: 'WHATSAPP' });
+
+      await expect(
+        service.sendForm('conv1', 'agent-1', { message: 'Completa tus datos', fields: [{ label: 'Nombre', fieldType: 'text' }] }),
+      ).rejects.toThrow(ValidationError);
+      expect(tx.message.create).not.toHaveBeenCalled();
+    });
+
+    it('builds an INTERACTIVE form message with a default submit label when none is given', async () => {
+      conversationsService.findOne.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1', contactId: 'contact-1', channel: 'WEBCHAT' });
+      tx.message.create.mockResolvedValue({ id: 'msg1' });
+      tx.message.findUnique.mockResolvedValue({ id: 'msg1' });
+
+      await service.sendForm('conv1', 'agent-1', {
+        message: 'Completa tus datos',
+        fields: [
+          { label: 'Nombre', fieldType: 'text' },
+          { label: 'Email', fieldType: 'email' },
+        ],
+      });
+
+      expect(tx.message.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          type: 'INTERACTIVE',
+          interactivePayload: {
+            kind: 'form',
+            message: 'Completa tus datos',
+            fields: [
+              { id: 'field_0', label: 'Nombre', fieldType: 'text' },
+              { id: 'field_1', label: 'Email', fieldType: 'email' },
+            ],
+            submitLabel: 'Enviar',
+          },
+        }),
+      });
+    });
+
+    it('uses a custom submit label when given', async () => {
+      conversationsService.findOne.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1', contactId: 'contact-1', channel: 'WEBCHAT' });
+      tx.message.create.mockResolvedValue({ id: 'msg1' });
+      tx.message.findUnique.mockResolvedValue({ id: 'msg1' });
+
+      await service.sendForm('conv1', 'agent-1', {
+        message: 'Completa tus datos',
+        fields: [{ label: 'Nombre', fieldType: 'text' }],
+        submitLabel: 'Confirmar datos',
+      });
+
+      const [[{ data }]] = tx.message.create.mock.calls;
+      expect(data.interactivePayload.submitLabel).toBe('Confirmar datos');
+    });
+  });
 });

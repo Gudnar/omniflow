@@ -83,4 +83,33 @@ describe('DeepSeekAdapter', () => {
 
     expect(result.toolCalls).toEqual([{ name: 'send_storefront_link', arguments: '{"action":"STORE"}' }]);
   });
+
+  it('translates a tool-call/tool-result turn pair the same way as OpenAI', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ choices: [{ message: { content: 'Tenemos 3 en stock.' } }], usage: {} }),
+    }) as any;
+
+    await adapter.complete({
+      apiKey: 'ds-test',
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'assistant', content: '', toolCalls: [{ id: 'call_1', name: 'check_stock', arguments: '{"productId":"p1"}' }] },
+        { role: 'tool', toolCallId: 'call_1', content: '{"stock":3}' },
+      ],
+      temperature: 0.7,
+      maxTokens: 500,
+    });
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.messages).toEqual([
+      {
+        role: 'assistant',
+        content: null,
+        tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'check_stock', arguments: '{"productId":"p1"}' } }],
+      },
+      { role: 'tool', tool_call_id: 'call_1', content: '{"stock":3}' },
+    ]);
+  });
 });

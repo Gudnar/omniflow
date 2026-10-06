@@ -29,6 +29,10 @@ export interface Tenant {
   appointmentApprovalMode: string;
   notifyOnOrderPendingApproval: boolean;
   notifyOnAppointmentPendingApproval: boolean;
+  sendAppointmentQrCode: boolean;
+  sendAppointmentReceiptImage: boolean;
+  sendOrderQrCode: boolean;
+  sendOrderReceiptImage: boolean;
 }
 
 export type PaymentMethodType = 'CASH' | 'BANK_TRANSFER' | 'QR';
@@ -92,8 +96,17 @@ export interface AiAgent {
   escalationKeywords: string[];
   maxTokens: number;
   knowledgeDocuments: { document: { id: string; title: string; status: KnowledgeDocumentStatus } }[];
+  enabledTools: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export type AiToolRiskLevel = 'read' | 'write' | 'critical';
+
+export interface AiTool {
+  name: string;
+  description: string;
+  riskLevel: AiToolRiskLevel;
 }
 
 export interface AiUsageEntry {
@@ -195,7 +208,11 @@ export interface Conversation {
 }
 
 export type MessageDirection = 'INBOUND' | 'OUTBOUND';
-export type MessageType = 'TEXT' | 'NOTE' | 'SYSTEM' | 'TEMPLATE' | 'AUDIO' | 'CTA';
+export type MessageType = 'TEXT' | 'NOTE' | 'SYSTEM' | 'TEMPLATE' | 'AUDIO' | 'CTA' | 'INTERACTIVE';
+
+export type InteractivePayload =
+  | { kind: 'quick_replies'; message: string; options: { id: string; label: string }[] }
+  | { kind: 'form'; message: string; fields: { id: string; label: string; fieldType: 'text' | 'email' | 'tel' | 'number' }[]; submitLabel: string };
 
 export interface Attachment {
   id: string;
@@ -240,7 +257,10 @@ export interface Message {
   // Set only when type is 'CTA' — an agent-initiated "go to the store/
   // booking" message with a real, already-generated link (never a raw LLM
   // URL). See AiReplyService's send_storefront_link tool.
-  ctaPayload?: { action: 'STORE' | 'BOOKING'; url: string } | null;
+  ctaPayload?: { action: 'STORE' | 'BOOKING'; url: string; label: string } | null;
+  // Set only when type is 'INTERACTIVE' — quick-reply buttons or an inline
+  // form, sent by the AI agent or a human operator.
+  interactivePayload?: InteractivePayload | null;
 }
 
 // GET /conversation-window/:token — never includes NOTE/SYSTEM messages
@@ -348,6 +368,9 @@ export interface Product {
   slug: string;
   description: string | null;
   status: ProductStatus;
+  requiresPreparation: boolean;
+  preparationReason: string | null;
+  preparationMinutes: number | null;
   createdAt: string;
   updatedAt: string;
   category: { id: string; name: string } | null;
@@ -433,7 +456,7 @@ export interface CartItem {
   unitPrice: number;
   discount: number;
   subtotal: number;
-  product: { id: string; name: string };
+  product: { id: string; name: string; requiresPreparation: boolean; preparationReason: string | null; preparationMinutes: number | null };
   variant: { id: string; name: string | null; sku: string };
 }
 
@@ -461,6 +484,9 @@ export interface OrderItem {
   variantId: string;
   productNameSnapshot: string;
   skuSnapshot: string;
+  requiresPreparationSnapshot: boolean;
+  preparationReasonSnapshot: string | null;
+  preparationMinutesSnapshot: number | null;
   quantity: number;
   unitPrice: number;
   discount: number;
@@ -615,6 +641,8 @@ export interface Appointment {
   endAt: string;
   status: AppointmentStatus;
   notes: string | null;
+  patientName: string | null;
+  groupId: string | null;
   subtotal: number;
   total: number;
   currency: string;
@@ -887,6 +915,8 @@ export interface WebchatMessage {
   type: string;
   content: string;
   createdAt: string;
+  ctaPayload?: { action: 'STORE' | 'BOOKING'; url: string; label: string } | null;
+  interactivePayload?: InteractivePayload | null;
 }
 
 // GET /analytics/overview — backs the dashboard home page. `changePct` is

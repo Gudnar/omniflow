@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { StorefrontService } from './storefront.service';
 import { AppointmentsService } from '../booking/appointments.service';
 import { BookingServicesService } from '../booking/booking-services.service';
-import { PublicAvailabilityQueryDto, PublicBookAppointmentDto } from './dto/public-booking.dto';
+import { PublicAvailabilityQueryDto, PublicBookAppointmentDto, PublicBookAppointmentGroupDto } from './dto/public-booking.dto';
 
 // Public booking surface for the same storefront/session token used by the
 // ecommerce flow (StorefrontService) — a tenant with operationMode BOOKING
@@ -85,6 +85,25 @@ export class BookingStorefrontService {
       branchId: session.branchId!,
       serviceIds: [dto.serviceId],
       startAt: dto.startAt,
+      commerceSessionId: session.id,
+    } as any);
+  }
+
+  // Same lead-time guardrail as bookAppointment(), applied once to the first
+  // patient's turn — the rest follow sequentially right after it.
+  async bookAppointmentGroup(token: string, dto: PublicBookAppointmentGroupDto) {
+    const { session, branch } = await this.requireSessionBranch(token);
+    const dateStr = dto.startAt.slice(0, 10);
+    if (dateStr < this.earliestBookableDate(branch.minBookingLeadDays)) {
+      throw new ValidationError(`Debes reservar con al menos ${branch.minBookingLeadDays} día(s) de anticipación`);
+    }
+
+    return this.appointmentsService.createGroup({
+      contactId: session.contactId,
+      branchId: session.branchId!,
+      startAt: dto.startAt,
+      patients: dto.patients.map((p) => ({ patientName: p.patientName, serviceIds: [p.serviceId] })),
+      commerceSessionId: session.id,
     } as any);
   }
 }

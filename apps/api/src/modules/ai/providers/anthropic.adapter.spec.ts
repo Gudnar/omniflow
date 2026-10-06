@@ -105,4 +105,31 @@ describe('AnthropicAdapter', () => {
     expect(result.toolCalls).toEqual([{ name: 'send_storefront_link', arguments: '{"action":"STORE"}' }]);
     expect(result.content).toBe('');
   });
+
+  it('translates an assistant tool-call turn into a tool_use block and bundles its result into one user tool_result message', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ content: [{ type: 'text', text: 'Tenemos 3 en stock.' }], usage: {} }),
+    }) as any;
+
+    await adapter.complete({
+      apiKey: 'sk-ant-test',
+      model: 'claude-sonnet-4-5',
+      messages: [
+        { role: 'user', content: '¿hay stock?' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 'toolu_1', name: 'check_stock', arguments: '{"productId":"p1"}' }] },
+        { role: 'tool', toolCallId: 'toolu_1', content: '{"stock":3}' },
+      ],
+      temperature: 0.7,
+      maxTokens: 500,
+    });
+
+    const [, init] = (global.fetch as jest.Mock).mock.calls[0];
+    const body = JSON.parse(init.body);
+    expect(body.messages).toEqual([
+      { role: 'user', content: '¿hay stock?' },
+      { role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_1', name: 'check_stock', input: { productId: 'p1' } }] },
+      { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_1', content: '{"stock":3}' }] },
+    ]);
+  });
 });

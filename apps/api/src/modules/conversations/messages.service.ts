@@ -6,6 +6,7 @@ import { QueueService } from '../queue/queue.service';
 import { EventsService } from '../events/events.service';
 import { ValidationError } from '@omniflow/utils';
 import { CreateMessageDto } from './dto/create-message.dto';
+import { SendQuickRepliesDto, SendFormDto } from './dto/interactive-message.dto';
 
 @Injectable()
 export class MessagesService {
@@ -49,6 +50,7 @@ export class MessagesService {
           senderId,
           externalId: dto.externalId,
           ctaPayload: dto.ctaPayload,
+          interactivePayload: dto.interactivePayload,
         },
       });
 
@@ -121,6 +123,34 @@ export class MessagesService {
     }
 
     return message;
+  }
+
+  // Human-operator path for the two new interactive message kinds (the AI
+  // agent sends the same shapes directly via AiReplyService's
+  // send_quick_replies/send_form tools, bypassing this but hitting the same
+  // create() underneath) — see MessagesController for the HTTP endpoints.
+  async sendQuickReplies(conversationId: string, actorUserId: string, dto: SendQuickRepliesDto) {
+    const options = dto.options.map((label, i) => ({ id: `opt_${i}`, label }));
+    return this.create(conversationId, actorUserId, {
+      direction: 'OUTBOUND',
+      type: 'INTERACTIVE',
+      content: dto.message,
+      interactivePayload: { kind: 'quick_replies', message: dto.message, options },
+    } as any);
+  }
+
+  async sendForm(conversationId: string, actorUserId: string, dto: SendFormDto) {
+    const conversation = await this.conversationsService.findOne(conversationId);
+    if (conversation.channel !== 'WEBCHAT') {
+      throw new ValidationError('Forms can only be sent on web chat conversations — WhatsApp/Instagram/etc. have no native multi-field form message type.');
+    }
+    const fields = dto.fields.map((f, i) => ({ id: `field_${i}`, label: f.label, fieldType: f.fieldType }));
+    return this.create(conversationId, actorUserId, {
+      direction: 'OUTBOUND',
+      type: 'INTERACTIVE',
+      content: dto.message,
+      interactivePayload: { kind: 'form', message: dto.message, fields, submitLabel: dto.submitLabel?.trim() || 'Enviar' },
+    } as any);
   }
 
   // Facebook (Channel.FACEBOOK) is intentionally excluded — that enum value

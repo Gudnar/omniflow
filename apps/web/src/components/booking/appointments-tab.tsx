@@ -228,7 +228,10 @@ export function AppointmentsTab() {
                   onClick={() => setSelectedId(a.id)}
                   className="border-b border-gray-50 cursor-pointer transition hover:bg-gray-50"
                 >
-                  <td className="px-4 py-3 font-medium text-gray-900">{a.contact.name}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {a.contact.name}
+                    {a.patientName && <span className="block text-xs font-normal text-gray-400">Para {a.patientName}</span>}
+                  </td>
                   <td className="px-3 py-3 text-gray-600">{a.services.map((s) => s.serviceNameSnapshot).join(', ')}</td>
                   <td className="px-3 py-3 text-gray-600">{a.branch.name}</td>
                   <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{formatZonedDateTime(a.startAt, a.branch.timezone)}</td>
@@ -256,7 +259,12 @@ export function AppointmentsTab() {
 
       <Modal open={selectedId !== null} onClose={() => setSelectedId(null)} size="lg">
         {selectedId && (
-          <AppointmentDetailPanel appointmentId={selectedId} onClose={() => setSelectedId(null)} onChanged={refetch} />
+          <AppointmentDetailPanel
+            appointmentId={selectedId}
+            onClose={() => setSelectedId(null)}
+            onChanged={refetch}
+            onSelectAppointment={setSelectedId}
+          />
         )}
       </Modal>
 

@@ -138,6 +138,34 @@ describe('MetaWebhookService', () => {
       expect(conversationsService.create).not.toHaveBeenCalled();
     });
 
+    it("uses the tapped button's title as the content for a native interactive reply", async () => {
+      prisma.raw.metaConnection.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+      prisma.raw.message.findUnique.mockResolvedValue(null);
+      prisma.client.contactChannel.findFirst.mockResolvedValue({ id: 'cc1', contactId: 'ct1' });
+      prisma.client.conversation.findFirst.mockResolvedValue({ id: 'conv1', status: 'OPEN' });
+
+      await service.handlePayload(
+        buildWhatsAppPayload(
+          buildWhatsAppValue({
+            messages: [
+              {
+                from: '59178889999',
+                id: 'wamid.BTN001',
+                type: 'interactive',
+                interactive: { type: 'button_reply', button_reply: { id: 'opt_0', title: 'Retiro' } },
+              },
+            ],
+          }),
+        ),
+      );
+
+      expect(messagesService.create).toHaveBeenCalledWith(
+        'conv1',
+        undefined,
+        expect.objectContaining({ direction: 'INBOUND', externalId: 'wamid.BTN001', content: 'Retiro' }),
+      );
+    });
+
     describe('voice notes (msg.type === "audio")', () => {
       function buildAudioValue(overrides: any = {}) {
         return buildWhatsAppValue({

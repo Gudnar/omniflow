@@ -39,7 +39,15 @@ export class CreateMessageDto {
   // HTTP body that tries to set this field is rejected with 400 before it
   // ever reaches the service. Only an in-process call (which bypasses the
   // pipe entirely) can populate it.
-  declare ctaPayload?: { action: 'STORE' | 'BOOKING'; url: string };
+  declare ctaPayload?: { action: 'STORE' | 'BOOKING'; url: string; label: string };
+
+  // Internal-only, same protection as ctaPayload above — constructed
+  // server-side only, by either AiReplyService's send_quick_replies/send_form
+  // tools or MessagesService.sendQuickReplies()/sendForm() (the human-operator
+  // path, itself fed by its own strictly-validated DTO, never a raw client blob).
+  declare interactivePayload?:
+    | { kind: 'quick_replies'; message: string; options: { id: string; label: string }[] }
+    | { kind: 'form'; message: string; fields: { id: string; label: string; fieldType: 'text' | 'email' | 'tel' | 'number' }[]; submitLabel: string };
 
   // Internal-only — set exclusively by ConversationWindowService.sendMessage()
   // when the customer typed this INBOUND message via /chat/[token] rather

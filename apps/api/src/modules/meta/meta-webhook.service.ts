@@ -119,9 +119,16 @@ export class MetaWebhookService {
           continue;
         }
 
+        // A tap on a native interactive button/list we sent (see
+        // whatsapp-outbound-processor.ts) arrives with msg.type === 'interactive'
+        // and no msg.text at all — the chosen option's title is the closest
+        // thing to "what the customer typed", same as a quick-reply tap on
+        // web chat becomes a plain INBOUND text message there.
+        const interactiveReplyTitle = msg.interactive?.button_reply?.title ?? msg.interactive?.list_reply?.title;
+
         await this.processInboundMessage('WHATSAPP', {
           externalContactId: msg.from,
-          content: msg.text?.body ?? '',
+          content: interactiveReplyTitle ?? msg.text?.body ?? '',
           externalMessageId: msg.id,
           profileName: value.contacts?.[0]?.profile?.name,
         });

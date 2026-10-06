@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, CheckCircle2, Hand, CalendarClock, Users } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Hand, CalendarClock, Users, QrCode, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPatch } from '@/lib/api-client';
@@ -52,6 +52,18 @@ export function BookingsTab() {
       toast.error(err.message ?? 'No se pudo actualizar el modo de aprobación');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleImageSetting = async (field: 'sendAppointmentQrCode' | 'sendAppointmentReceiptImage') => {
+    if (!tenant) return;
+    const value = !tenant[field];
+    setTenant({ ...tenant, [field]: value });
+    try {
+      await apiPatch('/tenant', tokens?.accessToken, { [field]: value });
+    } catch (err: any) {
+      setTenant({ ...tenant, [field]: !value });
+      toast.error(err.message ?? 'No se pudo actualizar la configuración');
     }
   };
 
@@ -119,6 +131,61 @@ export function BookingsTab() {
                 </p>
               </div>
             </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="text-base font-bold text-gray-900 mb-1">Confirmación por imagen</h3>
+          <p className="text-sm text-gray-500 mb-4">
+            Al reservarse una cita, enviar automáticamente estas imágenes a la conversación del cliente.
+          </p>
+
+          <div className="divide-y divide-gray-100">
+            <div className="flex items-center justify-between gap-4 py-3">
+              <div className="flex items-start gap-2.5">
+                <QrCode className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Código QR</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Con los datos de la cita (cliente, servicio, fecha).</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleImageSetting('sendAppointmentQrCode')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition shrink-0 ${
+                  tenant.sendAppointmentQrCode ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                    tenant.sendAppointmentQrCode ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 py-3">
+              <div className="flex items-start gap-2.5">
+                <ImageIcon className="w-4 h-4 text-gray-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">Imagen de comprobante</p>
+                  <p className="text-xs text-gray-500 mt-0.5">Detalle del servicio, horario y total, como un recibo.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => toggleImageSetting('sendAppointmentReceiptImage')}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition shrink-0 ${
+                  tenant.sendAppointmentReceiptImage ? 'bg-blue-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                    tenant.sendAppointmentReceiptImage ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
           </div>
         </div>
 

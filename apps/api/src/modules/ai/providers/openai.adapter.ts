@@ -1,8 +1,27 @@
 import { Injectable } from '@nestjs/common';
 import { ValidationError } from '@omniflow/utils';
-import { LlmAdapter, LlmCompletionParams, LlmCompletionResult } from './llm-adapter.types';
+import { LlmAdapter, LlmCompletionParams, LlmCompletionResult, LlmMessage } from './llm-adapter.types';
 
 export * from './llm-adapter.types';
+
+// Translates the canonical multi-turn shape (see llm-adapter.types.ts) into
+// OpenAI's own wire format: a flat 'tool' role + 'tool_call_id', and an
+// assistant message that called tools carries them in `tool_calls`.
+export function toOpenAiMessages(messages: LlmMessage[]): any[] {
+  return messages.map((m) => {
+    if (m.role === 'assistant' && m.toolCalls?.length) {
+      return {
+        role: 'assistant',
+        content: m.content || null,
+        tool_calls: m.toolCalls.map((tc) => ({ id: tc.id, type: 'function', function: { name: tc.name, arguments: tc.arguments } })),
+      };
+    }
+    if (m.role === 'tool') {
+      return { role: 'tool', tool_call_id: m.toolCallId, content: m.content };
+    }
+    return { role: m.role, content: m.content };
+  });
+}
 
 @Injectable()
 export class OpenAiAdapter implements LlmAdapter {
@@ -19,7 +38,7 @@ export class OpenAiAdapter implements LlmAdapter {
       },
       body: JSON.stringify({
         model: params.model,
-        messages: params.messages,
+        messages: toOpenAiMessages(params.messages),
         temperature: params.temperature,
         max_tokens: params.maxTokens,
         ...(params.tools?.length && {
@@ -36,6 +55,7 @@ export class OpenAiAdapter implements LlmAdapter {
 
     const data: any = await response.json();
     const toolCalls = data.choices?.[0]?.message?.tool_calls?.map((tc: any) => ({
+      id: tc.id,
       name: tc.function.name,
       arguments: tc.function.arguments,
     }));

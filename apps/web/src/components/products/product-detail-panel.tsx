@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Plus, Trash2, Star } from 'lucide-react';
+import { X, Plus, Trash2, Star, Clock } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api-client';
@@ -116,6 +116,11 @@ function GeneralSection({
   const [description, setDescription] = useState(product.description ?? '');
   const [categoryId, setCategoryId] = useState(product.categoryId ?? '');
   const [status, setStatus] = useState<ProductStatus>(product.status);
+  const [requiresPreparation, setRequiresPreparation] = useState(product.requiresPreparation);
+  const [preparationReason, setPreparationReason] = useState(product.preparationReason ?? '');
+  const [preparationMinutes, setPreparationMinutes] = useState(
+    product.preparationMinutes != null ? String(product.preparationMinutes) : '',
+  );
 
   const save = async () => {
     try {
@@ -125,6 +130,9 @@ function GeneralSection({
         description: description || undefined,
         categoryId: categoryId || undefined,
         status,
+        requiresPreparation,
+        preparationReason: requiresPreparation ? preparationReason || undefined : null,
+        preparationMinutes: requiresPreparation && preparationMinutes ? Number(preparationMinutes) : null,
       });
       onSaved();
       toast.success('Producto actualizado correctamente');
@@ -183,6 +191,56 @@ function GeneralSection({
             <option value="ARCHIVED">Archivado</option>
           </select>
         </div>
+      </div>
+
+      <div className="border border-gray-200 rounded-lg p-3.5">
+        <label className="flex items-center justify-between gap-4 cursor-pointer">
+          <span className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+            <Clock className="w-4 h-4 text-gray-400" /> Requiere tiempo de preparación
+          </span>
+          <button
+            type="button"
+            onClick={() => setRequiresPreparation((v) => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition shrink-0 ${
+              requiresPreparation ? 'bg-blue-600' : 'bg-gray-300'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                requiresPreparation ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </label>
+        <p className="text-xs text-gray-500 mt-1.5">
+          Ej. medicamentos con cadena de frío, comida que se prepara al momento, helados. Se informa al cliente solo
+          cuando elige retiro en sucursal, no en entregas a domicilio ni envíos.
+        </p>
+
+        {requiresPreparation && (
+          <div className="grid grid-cols-2 gap-3 mt-3">
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Motivo</label>
+              <input
+                value={preparationReason}
+                onChange={(e) => setPreparationReason(e.target.value)}
+                placeholder="Ej. Requiere cadena de frío"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1.5">Minutos estimados</label>
+              <input
+                type="number"
+                min={1}
+                value={preparationMinutes}
+                onChange={(e) => setPreparationMinutes(e.target.value)}
+                placeholder="30"
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex justify-between pt-2">

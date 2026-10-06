@@ -4,6 +4,7 @@ import { RequirePermission } from '../auth/decorators';
 import { AiCatalogService } from './ai-catalog.service';
 import { AiCredentialsService } from './ai-credentials.service';
 import { UpsertAiCredentialDto, TestAiCredentialDto } from './dto/ai-credential.dto';
+import { ALL_TOOLS } from './tools/registry';
 
 @Controller('ai')
 @UseGuards(JwtAuthGuard)
@@ -12,6 +13,16 @@ export class AiCatalogController {
     private catalogService: AiCatalogService,
     private credentialsService: AiCredentialsService,
   ) {}
+
+  // Phase 14: AI Commerce — static metadata (name/description/riskLevel),
+  // never per-tenant, so the agent form can render the full tool picker
+  // without duplicating the registry on the frontend.
+  @Get('tools')
+  @RequirePermission('ai.read')
+  @HttpCode(200)
+  listTools() {
+    return ALL_TOOLS.map(({ name, description, riskLevel }) => ({ name, description, riskLevel }));
+  }
 
   @Get('providers')
   @RequirePermission('ai.read')

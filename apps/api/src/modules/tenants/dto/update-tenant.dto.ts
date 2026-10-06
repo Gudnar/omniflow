@@ -61,4 +61,20 @@ export class UpdateTenantDto {
   @IsBoolean()
   @IsOptional()
   declare notifyOnAppointmentPendingApproval?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  declare sendAppointmentQrCode?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  declare sendAppointmentReceiptImage?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  declare sendOrderQrCode?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  declare sendOrderReceiptImage?: boolean;
 }

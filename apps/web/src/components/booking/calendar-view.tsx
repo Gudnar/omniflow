@@ -119,6 +119,7 @@ function AppointmentBlock({ item, onSelect }: { item: Positioned; onSelect: (id:
   const leftPct = item.lane * widthPct;
   const time = new Date(a.startAt).toLocaleTimeString('es-BO', { timeZone: a.branch.timezone, hour: '2-digit', minute: '2-digit', hour12: false });
   const resourceName = a.resources[0]?.resource.name;
+  const who = a.patientName ? `${a.patientName} (${a.contact.name})` : a.contact.name;
 
   return (
     <button
@@ -130,9 +131,9 @@ function AppointmentBlock({ item, onSelect }: { item: Positioned; onSelect: (id:
         left: `calc(${leftPct}% + 2px)`,
         width: `calc(${widthPct}% - 4px)`,
       }}
-      title={`${time} · ${a.contact.name} · ${a.services.map((s) => s.serviceNameSnapshot).join(', ')}`}
+      title={`${time} · ${who} · ${a.services.map((s) => s.serviceNameSnapshot).join(', ')}`}
     >
-      <p className="text-[11px] font-semibold leading-tight truncate">{time} · {a.contact.name}</p>
+      <p className="text-[11px] font-semibold leading-tight truncate">{time} · {who}</p>
       {item.height > 32 && (
         <p className="text-[10px] leading-tight truncate opacity-80">
           {a.services.map((s) => s.serviceNameSnapshot).join(', ')}

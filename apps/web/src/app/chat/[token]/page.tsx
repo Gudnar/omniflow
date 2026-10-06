@@ -43,6 +43,9 @@ export default function ConversationWindowPage() {
   const [notFound, setNotFound] = useState(false);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  // Quick-reply buttons and forms are one-shot — once answered, that bubble
+  // stops being interactive instead of staying clickable/editable.
+  const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set());
   const socketRef = useRef<Socket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -70,19 +73,25 @@ export default function ConversationWindowPage() {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [data?.messages.length]);
 
-  const send = async () => {
-    if (!text.trim() || sending) return;
+  const sendContent = async (content: string, sourceMessageId?: string) => {
+    if (!content.trim() || sending) return;
     setSending(true);
-    const content = text;
-    setText('');
     try {
       await apiPost(`/conversation-window/${token}/messages`, undefined, { content });
+      if (sourceMessageId) setAnsweredIds((prev) => new Set(prev).add(sourceMessageId));
       await loadWindow();
     } catch (err) {
       console.error('Error sending message:', err);
     } finally {
       setSending(false);
     }
+  };
+
+  const send = async () => {
+    if (!text.trim()) return;
+    const content = text;
+    setText('');
+    await sendContent(content);
   };
 
   if (notFound) {
@@ -152,7 +161,7 @@ export default function ConversationWindowPage() {
           // shape) only belongs on the LAST bubble of a consecutive run from
           // the same sender — grouped bubbles above it stay fully rounded,
           // exactly like the real app.
-          const isLastInGroup = !next || next.direction !== m.direction || next.type === 'CTA';
+          const isLastInGroup = !next || next.direction !== m.direction || next.type === 'CTA' || next.type === 'INTERACTIVE';
           const bubbleRadius = isMine
             ? { borderRadius: isLastInGroup ? '10px 10px 2px 10px' : '10px' }
             : { borderRadius: isLastInGroup ? '10px 10px 10px 2px' : '10px' };
@@ -169,7 +178,6 @@ export default function ConversationWindowPage() {
 
           if (m.type === 'CTA' && m.ctaPayload) {
             const intro = m.content.replace(m.ctaPayload.url, '').trim();
-            const label = m.ctaPayload.action === 'BOOKING' ? 'Reservar cita' : 'Ir a la tienda';
             return (
               <div key={m.id}>
                 {dateSeparator}
@@ -182,9 +190,53 @@ export default function ConversationWindowPage() {
                       style={{ color: WHATSAPP_LINK_BLUE }}
                     >
                       <Link2 className="w-4 h-4" />
-                      {label}
+                      {m.ctaPayload.label}
                     </a>
                   </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (m.type === 'INTERACTIVE' && m.interactivePayload?.kind === 'quick_replies') {
+            const payload = m.interactivePayload;
+            const answered = answeredIds.has(m.id);
+            return (
+              <div key={m.id}>
+                {dateSeparator}
+                <div className={`flex justify-start ${isLastInGroup ? 'mb-2' : 'mb-0.5'}`}>
+                  <div className="max-w-[80%] w-full rounded-lg shadow-sm overflow-hidden bg-white">
+                    <p className="px-3 pt-2.5 pb-2 text-sm text-gray-800">{payload.message}</p>
+                    <div className="border-t border-gray-100">
+                      {payload.options.map((opt, i) => (
+                        <button
+                          key={opt.id}
+                          disabled={answered || sending}
+                          onClick={() => sendContent(opt.label, m.id)}
+                          className={`w-full py-2.5 text-sm font-medium disabled:opacity-50 ${i > 0 ? 'border-t border-gray-100' : ''}`}
+                          style={{ color: WHATSAPP_LINK_BLUE }}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (m.type === 'INTERACTIVE' && m.interactivePayload?.kind === 'form') {
+            return (
+              <div key={m.id}>
+                {dateSeparator}
+                <div className={`flex justify-start ${isLastInGroup ? 'mb-2' : 'mb-0.5'}`}>
+                  <ChatWindowFormBubble
+                    payload={m.interactivePayload}
+                    answered={answeredIds.has(m.id)}
+                    sending={sending}
+                    onSubmit={(summary) => sendContent(summary, m.id)}
+                  />
                 </div>
               </div>
             );
@@ -233,6 +285,56 @@ export default function ConversationWindowPage() {
           style={{ backgroundColor: GREEN }}
         >
           <Send className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Same degrade-to-text submission as the embedded webchat widget's form
+// bubble: builds one human-readable summary line per field, sent as a
+// normal INBOUND message — no separate "form submission" concept downstream.
+function ChatWindowFormBubble({
+  payload,
+  answered,
+  sending,
+  onSubmit,
+}: {
+  payload: Extract<NonNullable<ConversationWindowData['messages'][number]['interactivePayload']>, { kind: 'form' }>;
+  answered: boolean;
+  sending: boolean;
+  onSubmit: (summary: string) => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const canSubmit = payload.fields.every((f) => (values[f.id] ?? '').trim().length > 0);
+
+  const submit = () => {
+    if (!canSubmit) return;
+    onSubmit(payload.fields.map((f) => `${f.label}: ${(values[f.id] ?? '').trim()}`).join('\n'));
+  };
+
+  return (
+    <div className="max-w-[85%] w-full rounded-lg shadow-sm overflow-hidden bg-white">
+      <p className="px-3 pt-2.5 pb-2 text-sm text-gray-800">{payload.message}</p>
+      <div className="px-3 pb-3 space-y-2">
+        {payload.fields.map((f) => (
+          <input
+            key={f.id}
+            type={f.fieldType === 'number' ? 'number' : f.fieldType === 'email' ? 'email' : f.fieldType === 'tel' ? 'tel' : 'text'}
+            placeholder={f.label}
+            disabled={answered}
+            value={values[f.id] ?? ''}
+            onChange={(e) => setValues((prev) => ({ ...prev, [f.id]: e.target.value }))}
+            className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-sm disabled:opacity-50"
+          />
+        ))}
+        <button
+          onClick={submit}
+          disabled={answered || sending || !canSubmit}
+          className="w-full py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-50"
+          style={{ backgroundColor: WHATSAPP_LINK_BLUE }}
+        >
+          {payload.submitLabel}
         </button>
       </div>
     </div>

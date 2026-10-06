@@ -4,6 +4,8 @@ import { NotFoundError, ValidationError } from '@omniflow/utils';
 import { EventsService } from '../events/events.service';
 import { TenantContextService } from '../tenant-context/tenant-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ConfirmationImagesService } from '../confirmation-images/confirmation-images.service';
+import { buildPreparationNotice } from './orders.service';
 import { AddCartItemDto, UpdateCartItemDto, CheckoutDto } from './dto/cart.dto';
 
 // Exported so any other service that needs a fully-hydrated cart (product/
@@ -11,7 +13,14 @@ import { AddCartItemDto, UpdateCartItemDto, CheckoutDto } from './dto/cart.dto';
 // see CommerceSessionsService.findOne, whose own `items: true` include used
 // to omit these, crashing the storefront's cart drawer on `item.product.name`.
 export const CART_INCLUDE = {
-  items: { include: { product: { select: { id: true, name: true } }, variant: { select: { id: true, name: true, sku: true } } } },
+  items: {
+    include: {
+      product: {
+        select: { id: true, name: true, requiresPreparation: true, preparationReason: true, preparationMinutes: true },
+      },
+      variant: { select: { id: true, name: true, sku: true } },
+    },
+  },
 };
 
 export function serializeCart(cart: any) {
@@ -55,6 +64,7 @@ export class CartsService {
     private eventsService: EventsService,
     private tenantContext: TenantContextService,
     private notificationsService: NotificationsService,
+    private confirmationImagesService: ConfirmationImagesService,
   ) {}
 
   async findOne(id: string) {
@@ -215,7 +225,13 @@ export class CartsService {
     const tenant = tenantId
       ? await this.prisma.client.tenant.findUnique({
           where: { id: tenantId },
-          select: { orderApprovalMode: true, notifyOnOrderPendingApproval: true },
+          select: {
+            name: true,
+            orderApprovalMode: true,
+            notifyOnOrderPendingApproval: true,
+            sendOrderQrCode: true,
+            sendOrderReceiptImage: true,
+          },
         })
       : null;
     const requiresManualApproval = tenant?.orderApprovalMode === 'MANUAL';
@@ -225,12 +241,14 @@ export class CartsService {
     // Previously this was captured then silently discarded: the order had
     // no record of it at all once checkout ran.
     let customerLocation: any = null;
+    let conversationId: string | null = null;
     if (freshCart.commerceSessionId) {
       const session = await this.prisma.client.commerceSession.findUnique({
         where: { id: freshCart.commerceSessionId },
-        select: { metadata: true },
+        select: { metadata: true, conversationId: true },
       });
       customerLocation = (session?.metadata as any)?.location ?? null;
+      conversationId = session?.conversationId ?? null;
     }
 
     const order = await this.prisma.client.$transaction(async (tx: any) => {
@@ -286,6 +304,9 @@ export class CartsService {
           variantId: item.variantId,
           productNameSnapshot: item.product.name,
           skuSnapshot: item.variant.sku,
+          requiresPreparationSnapshot: !!item.product.requiresPreparation,
+          preparationReasonSnapshot: item.product.requiresPreparation ? item.product.preparationReason : null,
+          preparationMinutesSnapshot: item.product.requiresPreparation ? item.product.preparationMinutes : null,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           discount: item.discount,
@@ -303,6 +324,42 @@ export class CartsService {
       { orderId: order.id, orderNumber: order.orderNumber, total: Number(order.total) },
       order.contactId,
     );
+
+    if (tenantId && conversationId && (tenant?.sendOrderQrCode || tenant?.sendOrderReceiptImage)) {
+      const preparationNotice = buildPreparationNotice(order.items, order.fulfillmentType);
+      const flaggedForPrep = order.items.filter((i: any) => i.requiresPreparationSnapshot);
+      const maxPrepMinutes = Math.max(0, ...flaggedForPrep.map((i: any) => i.preparationMinutesSnapshot ?? 0));
+
+      await this.confirmationImagesService.send({
+        tenantId,
+        conversationId,
+        sendQrCode: !!tenant?.sendOrderQrCode,
+        sendReceiptImage: !!tenant?.sendOrderReceiptImage,
+        qrText: [
+          'Pedido confirmado',
+          `N°: ${order.orderNumber}`,
+          `Total: ${order.currency} ${Number(order.total).toFixed(2)}`,
+          ...(preparationNotice ? [preparationNotice] : []),
+        ].join('\n'),
+        receipt: {
+          businessName: tenant?.name ?? '',
+          title: `Pedido ${order.orderNumber}`,
+          subtitle: new Date(order.createdAt).toLocaleString('es-BO', { dateStyle: 'medium', timeStyle: 'short' }),
+          lines: [
+            ...order.items.map((item: any) => ({
+              label: `${item.productNameSnapshot} x${item.quantity}`,
+              value: `${order.currency} ${Number(item.subtotal).toFixed(2)}`,
+            })),
+            ...(preparationNotice
+              ? [{ label: '⏱️ Preparación necesaria', value: maxPrepMinutes > 0 ? `~${maxPrepMinutes} min` : 'Sí' }]
+              : []),
+          ],
+          totalLabel: 'Total',
+          totalValue: `${order.currency} ${Number(order.total).toFixed(2)}`,
+          footer: '¡Gracias por tu compra!',
+        },
+      });
+    }
 
     if (requiresManualApproval) {
       await this.eventsService.emit(

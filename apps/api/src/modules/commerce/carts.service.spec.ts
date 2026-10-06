@@ -25,6 +25,7 @@ describe('CartsService', () => {
   let eventsService: any;
   let tenantContext: any;
   let notificationsService: any;
+  let confirmationImagesService: any;
 
   beforeEach(() => {
     tx = {
@@ -51,7 +52,8 @@ describe('CartsService', () => {
     eventsService = { emit: jest.fn() };
     tenantContext = { getTenantId: jest.fn().mockReturnValue('t1') };
     notificationsService = { create: jest.fn() };
-    service = new CartsService(prisma, eventsService, tenantContext, notificationsService);
+    confirmationImagesService = { send: jest.fn() };
+    service = new CartsService(prisma, eventsService, tenantContext, notificationsService, confirmationImagesService);
   });
 
   describe('findOne', () => {
@@ -281,6 +283,107 @@ describe('CartsService', () => {
       );
     });
 
+    it('sends confirmation images when the cart has a commerceSessionId with a conversation and the tenant has them enabled', async () => {
+      const item = {
+        id: 'ci1', variantId: 'v1', productId: 'p1', unitPrice: 25, discount: 0, subtotal: 50, quantity: 2,
+        product: { id: 'p1', name: 'Camiseta' }, variant: { id: 'v1', sku: 'CAM-M' },
+      };
+      prisma.client.cart.findUnique.mockResolvedValue(
+        decimalCart({ items: [item], subtotal: '50', total: '50', commerceSessionId: 'sess-1' }),
+      );
+      prisma.client.branchProduct.findUnique.mockResolvedValue({ price: '25.00', status: 'AVAILABLE', stock: 100, reservedStock: 0 });
+      prisma.client.cartItem.findMany.mockResolvedValue([item]);
+      prisma.client.tenant.findUnique.mockResolvedValue({
+        name: 'Demo Co',
+        orderApprovalMode: 'AUTOMATIC',
+        notifyOnOrderPendingApproval: true,
+        sendOrderQrCode: true,
+        sendOrderReceiptImage: true,
+      });
+      prisma.client.commerceSession.findUnique.mockResolvedValue({ metadata: {}, conversationId: 'conv1' });
+      tx.branchProduct.findUnique.mockResolvedValue({ id: 'bp1', reservedStock: 0 });
+      tx.order.create.mockResolvedValue({ id: 'order-1' });
+      tx.order.findUnique.mockResolvedValue({
+        id: 'order-1',
+        contactId: 'c1',
+        orderNumber: 'ORD-1',
+        currency: 'BOB',
+        createdAt: new Date('2026-01-05T09:00:00.000Z'),
+        items: [{ productNameSnapshot: 'Camiseta', quantity: 2, subtotal: '50' }],
+        subtotal: '50',
+        discount: '0',
+        shipping: '0',
+        tax: '0',
+        total: '50',
+      });
+
+      await service.checkout('cart-1', { fulfillmentType: 'PICKUP' } as any);
+
+      expect(confirmationImagesService.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tenantId: 't1',
+          conversationId: 'conv1',
+          sendQrCode: true,
+          sendReceiptImage: true,
+        }),
+      );
+    });
+
+    it('snapshots the preparation fields onto OrderItem and includes the notice in the image receipt for PICKUP', async () => {
+      const item = {
+        id: 'ci1', variantId: 'v1', productId: 'p1', unitPrice: 30, discount: 0, subtotal: 30, quantity: 1,
+        product: { id: 'p1', name: 'Helado de vainilla', requiresPreparation: true, preparationReason: 'Requiere congelación', preparationMinutes: 20 },
+        variant: { id: 'v1', sku: 'HEL-V' },
+      };
+      prisma.client.cart.findUnique.mockResolvedValue(
+        decimalCart({ items: [item], subtotal: '30', total: '30', commerceSessionId: 'sess-1' }),
+      );
+      prisma.client.branchProduct.findUnique.mockResolvedValue({ price: '30.00', status: 'AVAILABLE', stock: 100, reservedStock: 0 });
+      prisma.client.cartItem.findMany.mockResolvedValue([item]);
+      prisma.client.tenant.findUnique.mockResolvedValue({
+        name: 'Demo Co',
+        orderApprovalMode: 'AUTOMATIC',
+        notifyOnOrderPendingApproval: true,
+        sendOrderQrCode: true,
+        sendOrderReceiptImage: true,
+      });
+      prisma.client.commerceSession.findUnique.mockResolvedValue({ metadata: {}, conversationId: 'conv1' });
+      tx.branchProduct.findUnique.mockResolvedValue({ id: 'bp1', reservedStock: 0 });
+      tx.order.create.mockResolvedValue({ id: 'order-1' });
+      tx.order.findUnique.mockResolvedValue({
+        id: 'order-1',
+        contactId: 'c1',
+        orderNumber: 'ORD-1',
+        currency: 'BOB',
+        fulfillmentType: 'PICKUP',
+        createdAt: new Date('2026-01-05T09:00:00.000Z'),
+        items: [{
+          productNameSnapshot: 'Helado de vainilla', quantity: 1, subtotal: '30',
+          requiresPreparationSnapshot: true, preparationReasonSnapshot: 'Requiere congelación', preparationMinutesSnapshot: 20,
+        }],
+        subtotal: '30', discount: '0', shipping: '0', tax: '0', total: '30',
+      });
+
+      await service.checkout('cart-1', { fulfillmentType: 'PICKUP' } as any);
+
+      expect(tx.orderItem.createMany).toHaveBeenCalledWith({
+        data: [
+          expect.objectContaining({
+            requiresPreparationSnapshot: true,
+            preparationReasonSnapshot: 'Requiere congelación',
+            preparationMinutesSnapshot: 20,
+          }),
+        ],
+      });
+      expect(confirmationImagesService.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          receipt: expect.objectContaining({
+            lines: expect.arrayContaining([{ label: '⏱️ Preparación necesaria', value: '~20 min' }]),
+          }),
+        }),
+      );
+    });
+
     it('creates the order PENDING (no confirmedAt) when the tenant requires manual approval', async () => {
       const item = {
         id: 'ci1', variantId: 'v1', productId: 'p1', unitPrice: 25, discount: 0, subtotal: 50, quantity: 2,
@@ -359,7 +462,7 @@ describe('CartsService', () => {
 
       expect(prisma.client.commerceSession.findUnique).toHaveBeenCalledWith({
         where: { id: 'sess-1' },
-        select: { metadata: true },
+        select: { metadata: true, conversationId: true },
       });
       expect(tx.order.create).toHaveBeenCalledWith(
         expect.objectContaining({

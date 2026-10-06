@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
+import { ConfirmationImagesModule } from '../confirmation-images/confirmation-images.module';
 import { BookingServicesController } from './booking-services.controller';
 import { BookingServicesService } from './booking-services.service';
 import { BookingResourcesController } from './booking-resources.controller';
@@ -12,7 +13,7 @@ import { BookingBlackoutDatesController } from './booking-blackout-dates.control
 import { BookingBlackoutDatesService } from './booking-blackout-dates.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, ConfirmationImagesModule],
   controllers: [
     BookingServicesController,
     BookingResourcesController,

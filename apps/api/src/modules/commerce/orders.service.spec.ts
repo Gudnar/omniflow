@@ -344,5 +344,66 @@ describe('OrdersService', () => {
       expect(dto.content).toContain('Total: BOB 50.00');
       expect(result).toEqual({ success: true, message: { id: 'm1' } });
     });
+
+    it('includes a preparation notice when a PICKUP order has a flagged item', async () => {
+      const prepOrder = order({
+        cartId: 'c1',
+        currency: 'BOB',
+        fulfillmentType: 'PICKUP',
+        items: [
+          {
+            id: 'oi1',
+            productNameSnapshot: 'Helado de vainilla',
+            quantity: 1,
+            unitPrice: '30',
+            discount: '0',
+            subtotal: '30',
+            requiresPreparationSnapshot: true,
+            preparationReasonSnapshot: 'Requiere congelación',
+            preparationMinutesSnapshot: 20,
+          },
+        ],
+      });
+      prisma.client.order.findUnique.mockResolvedValue(prepOrder);
+      prisma.client.cart.findUnique.mockResolvedValue({ commerceSessionId: 's1' });
+      prisma.client.commerceSession.findUnique.mockResolvedValue({ conversationId: 'conv1' });
+      messagesService.create.mockResolvedValue({ id: 'm1' });
+
+      await service.sendReceipt('o1', 'u1');
+
+      const [, , dto] = messagesService.create.mock.calls[0];
+      expect(dto.content).toContain('Requiere congelación');
+      expect(dto.content).toContain('aprox. 20 min');
+    });
+
+    it('omits the preparation notice for a non-PICKUP order even with a flagged item', async () => {
+      const deliveryOrder = order({
+        cartId: 'c1',
+        currency: 'BOB',
+        fulfillmentType: 'LOCAL_DELIVERY',
+        items: [
+          {
+            id: 'oi1',
+            productNameSnapshot: 'Helado de vainilla',
+            quantity: 1,
+            unitPrice: '30',
+            discount: '0',
+            subtotal: '30',
+            requiresPreparationSnapshot: true,
+            preparationReasonSnapshot: 'Requiere congelación',
+            preparationMinutesSnapshot: 20,
+          },
+        ],
+      });
+      prisma.client.order.findUnique.mockResolvedValue(deliveryOrder);
+      prisma.client.cart.findUnique.mockResolvedValue({ commerceSessionId: 's1' });
+      prisma.client.commerceSession.findUnique.mockResolvedValue({ conversationId: 'conv1' });
+      messagesService.create.mockResolvedValue({ id: 'm1' });
+
+      await service.sendReceipt('o1', 'u1');
+
+      const [, , dto] = messagesService.create.mock.calls[0];
+      expect(dto.content).not.toContain('Requiere congelación');
+    });
   });
 });

@@ -75,6 +75,28 @@ const FULFILLMENT_TYPE_LABELS: Record<string, string> = {
   SHIPPING: 'Envío',
 };
 
+// Only relevant for PICKUP — a delivery/shipping order already has transit
+// time covering the prep, telling the customer about it there is just
+// noise. Reads the per-OrderItem snapshot (taken at checkout, see
+// CartsService.checkout()), not the live Product, so a later edit to the
+// product's prep settings never changes a past order's receipt. Shared by
+// OrdersService.buildReceiptText() (text) and CartsService.checkout()
+// (image receipt) — both generate a notice for the same order data.
+export function buildPreparationNotice(items: any[], fulfillmentType: string): string | null {
+  if (fulfillmentType !== 'PICKUP') return null;
+  const flagged = items.filter((i: any) => i.requiresPreparationSnapshot);
+  if (!flagged.length) return null;
+
+  const names = flagged.map((i: any) => i.productNameSnapshot).join(', ');
+  const reasons = Array.from(new Set(flagged.map((i: any) => i.preparationReasonSnapshot).filter(Boolean)));
+  const maxMinutes = Math.max(0, ...flagged.map((i: any) => i.preparationMinutesSnapshot ?? 0));
+
+  let notice = `Tu pedido incluye productos que necesitan tiempo de preparación: ${names}.`;
+  if (reasons.length) notice += ` (${reasons.join('; ')})`;
+  if (maxMinutes > 0) notice += ` Estará listo en aprox. ${maxMinutes} min.`;
+  return notice;
+}
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -188,6 +210,8 @@ export class OrdersService {
     lines.push(`Entrega: ${FULFILLMENT_TYPE_LABELS[order.fulfillmentType] ?? order.fulfillmentType}`);
     if (order.address) lines.push(`Dirección: ${order.address.addressLine}`);
     if (order.trackingCode) lines.push(`Código de seguimiento: ${order.trackingCode}`);
+    const preparationNotice = buildPreparationNotice(order.items, order.fulfillmentType);
+    if (preparationNotice) lines.push('', `⏱️ ${preparationNotice}`);
     lines.push('', '¡Gracias por tu compra!');
     return lines.join('\n');
   }

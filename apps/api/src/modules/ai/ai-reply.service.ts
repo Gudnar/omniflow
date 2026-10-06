@@ -8,14 +8,28 @@ import { OpenAiAdapter } from './providers/openai.adapter';
 import { AnthropicAdapter } from './providers/anthropic.adapter';
 import { GeminiAdapter } from './providers/gemini.adapter';
 import { DeepSeekAdapter } from './providers/deepseek.adapter';
-import { LlmAdapter, LlmMessage, LlmTool } from './providers/llm-adapter.types';
+import { LlmAdapter, LlmMessage, LlmTool, LlmToolCall } from './providers/llm-adapter.types';
 import { KnowledgeSearchService } from '../knowledge/knowledge-search.service';
 import { ContactCommerceService } from '../commerce/contact-commerce.service';
 import { AiCredentialsService } from './ai-credentials.service';
+import { AiToolsService } from './tools/ai-tools.service';
+import { getToolDefinition } from './tools/registry';
 
 const HISTORY_LIMIT = 20;
 const SEND_STOREFRONT_LINK_TOOL = 'send_storefront_link';
+const SEND_QUICK_REPLIES_TOOL = 'send_quick_replies';
+const SEND_FORM_TOOL = 'send_form';
+// Sending the interactive element to the customer IS the reply for these —
+// never fed back to the model for another round, unlike the generic
+// ecommerce/booking data tools in AiToolsService.
+const TERMINAL_TOOL_NAMES = new Set([SEND_STOREFRONT_LINK_TOOL, SEND_QUICK_REPLIES_TOOL, SEND_FORM_TOOL]);
 const MAX_CTA_MESSAGE_LENGTH = 300;
+const FORM_FIELD_TYPES = new Set(['text', 'email', 'tel', 'number']);
+// Hard ceiling on how many times one reply can round-trip through a tool
+// call before giving up and treating whatever text the model has produced
+// (often none) as final — guards against a model stuck calling tools in a
+// loop never converging on an answer.
+const MAX_TOOL_ITERATIONS = 6;
 
 // Only ever offered when canBuy/canBook say the store genuinely supports it
 // (see generateReply) — the `action` enum is narrowed at build time, and the
@@ -63,12 +77,17 @@ function buildSystemPrompt(
 }
 
 // Phase 13: AI foundation, extended in Phase 15 with RAG retrieval
-// (KnowledgeSearchService) — the orchestrator invoked from
+// (KnowledgeSearchService) and in Phase 14 with the full ecommerce/booking
+// tool suite (AiToolsService) — the orchestrator invoked from
 // InternalAiActionsController (apps/worker enqueues this off the hot webhook
 // path, same "queue → worker → internal callback" shape as
-// InternalFlowActionsController). Carries a single, narrowly-scoped Phase 14
-// tool (send_storefront_link) — not the full ecommerce/booking tool suite
-// AI_SPEC.md documents, which remains out of scope.
+// InternalFlowActionsController). Runs a standard multi-turn tool-calling
+// loop (call model → execute any requested tools → feed results back → call
+// model again) up to MAX_TOOL_ITERATIONS, same shape regardless of which
+// provider the agent uses (each LlmAdapter translates the canonical
+// LlmMessage history to/from its own wire format). send_storefront_link
+// stays separate and `terminal` — it's a UI handoff, not a data tool, and
+// its own side effect (the CTA message) IS the reply.
 @Injectable()
 export class AiReplyService {
   private readonly adapters: Record<AiProviderType, LlmAdapter>;
@@ -84,6 +103,7 @@ export class AiReplyService {
     private knowledgeSearchService: KnowledgeSearchService,
     private contactCommerceService: ContactCommerceService,
     private aiCredentialsService: AiCredentialsService,
+    private aiToolsService: AiToolsService,
   ) {
     this.adapters = {
       OPENAI: openAiAdapter,
@@ -167,69 +187,91 @@ export class AiReplyService {
     const canBook = storeAvailable && (store!.operationMode === 'BOOKING' || store!.operationMode === 'BOTH');
     const allowedActions: ('STORE' | 'BOOKING')[] = [...(canBuy ? (['STORE'] as const) : []), ...(canBook ? (['BOOKING'] as const) : [])];
 
-    const completion = await adapter.complete({
+    // Tool Policy: only tools this specific agent was explicitly enabled
+    // for (AiAgent.enabledTools, set by an admin with ai.manage) are ever
+    // offered to the model — same gate is re-checked per call below, so a
+    // hallucinated/unauthorized tool name can never execute even if some
+    // provider is lenient about calling tools it wasn't given.
+    const enabledTools: string[] = agent.enabledTools ?? [];
+    const dataTools: LlmTool[] = enabledTools
+      .map((name) => getToolDefinition(name))
+      .filter((d): d is NonNullable<typeof d> => !!d)
+      .map((d) => ({ name: d.name, description: d.description, parameters: d.parameters }));
+    const offeredTools: LlmTool[] = [...(allowedActions.length ? [buildStorefrontLinkTool(allowedActions)] : []), ...dataTools];
+
+    let messages: LlmMessage[] = chatMessages;
+    let completion = await adapter.complete({
       apiKey,
       model: agent.model.name,
-      messages: chatMessages,
+      messages,
       temperature: agent.temperature,
       maxTokens: agent.maxTokens,
-      ...(allowedActions.length && { tools: [buildStorefrontLinkTool(allowedActions)] }),
+      ...(offeredTools.length && { tools: offeredTools }),
     });
+    let promptTokens = completion.promptTokens;
+    let completionTokens = completion.completionTokens;
 
-    const toolCall = completion.toolCalls?.find((tc) => tc.name === SEND_STOREFRONT_LINK_TOOL);
-    if (toolCall) {
-      let args: { action?: string; message?: string } = {};
-      try {
-        args = JSON.parse(toolCall.arguments);
-      } catch {
-        logger.warn('AI tool call had unparsable arguments', { conversationId, agentId: agent.id });
-      }
-
-      const action = args.action === 'STORE' || args.action === 'BOOKING' ? args.action : null;
-      const introMessage = typeof args.message === 'string' ? args.message.trim().slice(0, MAX_CTA_MESSAGE_LENGTH) : '';
-      const authorized = (action === 'STORE' && canBuy) || (action === 'BOOKING' && canBook);
-
-      if (action && authorized && introMessage) {
-        const { url: storeUrl } = await this.contactCommerceService.generateStorefrontLink(conversation.contactId);
-        const [path, query] = storeUrl.split('?');
-        const url = action === 'BOOKING' ? `${path}/reservas?${query}` : storeUrl;
-
-        await this.prisma.client.aiUsage.create({
-          data: {
-            agentId: agent.id,
-            conversationId,
-            promptTokens: completion.promptTokens,
-            completionTokens: completion.completionTokens,
-            totalTokens: completion.promptTokens + completion.completionTokens,
-          },
+    for (let iteration = 0; iteration < MAX_TOOL_ITERATIONS && completion.toolCalls?.length; iteration++) {
+      const terminalCall = completion.toolCalls.find((tc) => TERMINAL_TOOL_NAMES.has(tc.name));
+      if (terminalCall) {
+        // send_storefront_link is gated by store capability (canBuy/canBook),
+        // not enabledTools — same as always. The two new conversation tools
+        // follow the normal Tool Policy gate like any data tool.
+        const authorized = terminalCall.name === SEND_STOREFRONT_LINK_TOOL || enabledTools.includes(terminalCall.name);
+        if (!authorized) {
+          logger.warn('AI tool call rejected: tool not enabled for this agent', { conversationId, agentId: agent.id, tool: terminalCall.name });
+          break;
+        }
+        const sent = await this.handleTerminalToolCall(terminalCall, {
+          conversationId,
+          contactId: conversation.contactId,
+          agentId: agent.id,
+          channel: conversation.channel,
+          canBuy,
+          canBook,
+          promptTokens,
+          completionTokens,
         });
-
-        await this.messagesService.create(conversationId, agent.id, {
-          direction: 'OUTBOUND',
-          type: 'CTA',
-          content: `${introMessage}\n\n${url}`,
-          ctaPayload: { action, url },
-        } as any);
-        return;
+        if (sent) return;
+        // Rejected (unauthorized/invalid args) — same as before, fall through
+        // to the generic "send completion.content as TEXT if non-empty"
+        // handling below rather than looping back to the model again.
+        break;
       }
 
-      // Model called the tool with an action it was never offered, or with
-      // missing/invalid arguments — never falls back to inventing free text
-      // here; if `completion.content` is also empty (the common case for a
-      // tool-call response), the guard below simply no-ops this turn.
-      logger.warn('AI tool call rejected: unauthorized or invalid arguments', { conversationId, agentId: agent.id, action: args.action });
+      messages = [...messages, { role: 'assistant', content: completion.content, toolCalls: completion.toolCalls }];
+
+      for (const call of completion.toolCalls) {
+        const result = enabledTools.includes(call.name)
+          ? await this.aiToolsService.execute(call.name, call.arguments, {
+              tenantId,
+              contactId: conversation.contactId,
+              conversationId,
+              agentId: agent.id,
+            })
+          : (() => {
+              logger.warn('AI tool call rejected: tool not enabled for this agent', { conversationId, agentId: agent.id, tool: call.name });
+              return { ok: false, error: 'This tool is not enabled for this agent.' };
+            })();
+        messages.push({ role: 'tool', toolCallId: call.id, toolName: call.name, content: JSON.stringify(result) });
+      }
+
+      completion = await adapter.complete({
+        apiKey,
+        model: agent.model.name,
+        messages,
+        temperature: agent.temperature,
+        maxTokens: agent.maxTokens,
+        ...(offeredTools.length && { tools: offeredTools }),
+      });
+      promptTokens += completion.promptTokens;
+      completionTokens += completion.completionTokens;
     }
 
     if (!completion.content.trim()) return;
 
     await this.prisma.client.aiUsage.create({
-      data: {
-        agentId: agent.id,
-        conversationId,
-        promptTokens: completion.promptTokens,
-        completionTokens: completion.completionTokens,
-        totalTokens: completion.promptTokens + completion.completionTokens,
-      },
+      data: { agentId: agent.id, conversationId, promptTokens, completionTokens, totalTokens: promptTokens + completionTokens },
     });
 
     await this.messagesService.create(conversationId, agent.id, {
@@ -238,4 +280,135 @@ export class AiReplyService {
       content: completion.content,
     });
   }
+
+  private async handleTerminalToolCall(toolCall: LlmToolCall, ctx: TerminalToolContext): Promise<boolean> {
+    switch (toolCall.name) {
+      case SEND_STOREFRONT_LINK_TOOL:
+        return this.handleStorefrontLinkCall(toolCall, ctx);
+      case SEND_QUICK_REPLIES_TOOL:
+        return this.handleSendQuickReplies(toolCall, ctx);
+      case SEND_FORM_TOOL:
+        return this.handleSendForm(toolCall, ctx);
+      default:
+        return false;
+    }
+  }
+
+  private async recordUsage(ctx: TerminalToolContext) {
+    await this.prisma.client.aiUsage.create({
+      data: {
+        agentId: ctx.agentId,
+        conversationId: ctx.conversationId,
+        promptTokens: ctx.promptTokens,
+        completionTokens: ctx.completionTokens,
+        totalTokens: ctx.promptTokens + ctx.completionTokens,
+      },
+    });
+  }
+
+  // Returns true when the CTA message was actually sent (and usage already
+  // recorded) — the caller ends the turn immediately in that case. Returns
+  // false for an unauthorized/invalid call, leaving the caller to fall back
+  // to sending completion.content as a normal TEXT reply if there is any.
+  private async handleStorefrontLinkCall(toolCall: LlmToolCall, ctx: TerminalToolContext): Promise<boolean> {
+    let args: { action?: string; message?: string } = {};
+    try {
+      args = JSON.parse(toolCall.arguments);
+    } catch {
+      logger.warn('AI tool call had unparsable arguments', { conversationId: ctx.conversationId, agentId: ctx.agentId });
+    }
+
+    const action = args.action === 'STORE' || args.action === 'BOOKING' ? args.action : null;
+    const introMessage = typeof args.message === 'string' ? args.message.trim().slice(0, MAX_CTA_MESSAGE_LENGTH) : '';
+    const authorized = (action === 'STORE' && ctx.canBuy) || (action === 'BOOKING' && ctx.canBook);
+
+    if (action && authorized && introMessage) {
+      const { url: storeUrl } = await this.contactCommerceService.generateStorefrontLink(ctx.contactId);
+      const [path, query] = storeUrl.split('?');
+      const url = action === 'BOOKING' ? `${path}/reservas?${query}` : storeUrl;
+      const label = action === 'BOOKING' ? 'Reservar cita' : 'Ir a la tienda';
+
+      await this.recordUsage(ctx);
+      await this.messagesService.create(ctx.conversationId, ctx.agentId, {
+        direction: 'OUTBOUND',
+        type: 'CTA',
+        content: `${introMessage}\n\n${url}`,
+        ctaPayload: { action, url, label },
+      } as any);
+      return true;
+    }
+
+    // Model called the tool with an action it was never offered, or with
+    // missing/invalid arguments — never falls back to inventing free text
+    // here; the caller decides what (if anything) happens next.
+    logger.warn('AI tool call rejected: unauthorized or invalid arguments', { conversationId: ctx.conversationId, agentId: ctx.agentId, action: args.action });
+    return false;
+  }
+
+  private async handleSendQuickReplies(toolCall: LlmToolCall, ctx: TerminalToolContext): Promise<boolean> {
+    let args: { message?: string; options?: unknown } = {};
+    try {
+      args = JSON.parse(toolCall.arguments);
+    } catch {
+      logger.warn('AI tool call had unparsable arguments', { conversationId: ctx.conversationId, agentId: ctx.agentId });
+    }
+
+    const message = typeof args.message === 'string' ? args.message.trim().slice(0, MAX_CTA_MESSAGE_LENGTH) : '';
+    const options = Array.isArray(args.options) ? args.options.filter((o): o is string => typeof o === 'string' && o.trim().length > 0) : [];
+
+    if (!message || options.length < 2 || options.length > 3) {
+      logger.warn('AI tool call rejected: invalid send_quick_replies arguments', { conversationId: ctx.conversationId, agentId: ctx.agentId });
+      return false;
+    }
+
+    await this.recordUsage(ctx);
+    await this.messagesService.sendQuickReplies(ctx.conversationId, ctx.agentId, { message, options });
+    return true;
+  }
+
+  private async handleSendForm(toolCall: LlmToolCall, ctx: TerminalToolContext): Promise<boolean> {
+    if (ctx.channel !== 'WEBCHAT') {
+      logger.warn('AI tool call rejected: send_form is only valid on web chat conversations', { conversationId: ctx.conversationId, agentId: ctx.agentId, channel: ctx.channel });
+      return false;
+    }
+
+    let args: { message?: string; fields?: unknown; submitLabel?: string } = {};
+    try {
+      args = JSON.parse(toolCall.arguments);
+    } catch {
+      logger.warn('AI tool call had unparsable arguments', { conversationId: ctx.conversationId, agentId: ctx.agentId });
+    }
+
+    const message = typeof args.message === 'string' ? args.message.trim().slice(0, MAX_CTA_MESSAGE_LENGTH) : '';
+    const fields = Array.isArray(args.fields)
+      ? args.fields.filter(
+          (f): f is { label: string; fieldType: string } =>
+            !!f && typeof (f as any).label === 'string' && (f as any).label.trim().length > 0 && FORM_FIELD_TYPES.has((f as any).fieldType),
+        )
+      : [];
+
+    if (!message || fields.length < 1 || fields.length > 6) {
+      logger.warn('AI tool call rejected: invalid send_form arguments', { conversationId: ctx.conversationId, agentId: ctx.agentId });
+      return false;
+    }
+
+    await this.recordUsage(ctx);
+    await this.messagesService.sendForm(ctx.conversationId, ctx.agentId, {
+      message,
+      fields: fields as { label: string; fieldType: 'text' | 'email' | 'tel' | 'number' }[],
+      submitLabel: typeof args.submitLabel === 'string' ? args.submitLabel.trim() : undefined,
+    });
+    return true;
+  }
+}
+
+interface TerminalToolContext {
+  conversationId: string;
+  contactId: string;
+  agentId: string;
+  channel: string;
+  canBuy: boolean;
+  canBook: boolean;
+  promptTokens: number;
+  completionTokens: number;
 }

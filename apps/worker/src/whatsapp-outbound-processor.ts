@@ -7,6 +7,74 @@ export interface ChannelOutboundJobData {
   messageId: string;
 }
 
+// WhatsApp's native reply-button titles are capped at 20 characters by the
+// Graph API itself — truncated here rather than left to fail the whole send.
+const WHATSAPP_BUTTON_TITLE_MAX = 20;
+
+// Builds the Graph API message body for every Message.type this processor
+// can send. CTA/INTERACTIVE use WhatsApp's own native interactive-message
+// types (cta_url / button) instead of plain text with a pasted link — same
+// visual language WhatsApp Business accounts use for real campaigns.
+// `kind: 'form'` has no WhatsApp equivalent (that's the separate "Flows"
+// product) — MessagesService.sendForm() already refuses to create one for a
+// non-WEBCHAT conversation, so this is a defensive fallback, not the normal
+// path.
+function buildOutboundBody(message: any, to: string): Record<string, unknown> {
+  if (message.type === 'TEMPLATE' && message.templatePayload) {
+    return { messaging_product: 'whatsapp', to, type: 'template', template: message.templatePayload };
+  }
+
+  if (message.type === 'CTA' && message.ctaPayload) {
+    const { url, label } = message.ctaPayload as { url: string; label: string };
+    const bodyText = message.content.replace(url, '').trim() || label;
+    return {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'interactive',
+      interactive: {
+        type: 'cta_url',
+        body: { text: bodyText },
+        action: { name: 'cta_url', parameters: { display_text: label, url } },
+      },
+    };
+  }
+
+  if (message.type === 'INTERACTIVE' && message.interactivePayload) {
+    const payload = message.interactivePayload as
+      | { kind: 'quick_replies'; message: string; options: { id: string; label: string }[] }
+      | { kind: 'form'; message: string; fields: { id: string; label: string }[] };
+
+    if (payload.kind === 'quick_replies') {
+      return {
+        messaging_product: 'whatsapp',
+        to,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: payload.message },
+          action: {
+            buttons: payload.options.map((o) => ({
+              type: 'reply',
+              reply: { id: o.id, title: o.label.slice(0, WHATSAPP_BUTTON_TITLE_MAX) },
+            })),
+          },
+        },
+      };
+    }
+
+    // kind === 'form' fallback — plain text listing the fields.
+    const fieldList = payload.fields.map((f) => `- ${f.label}`).join('\n');
+    return {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'text',
+      text: { body: `${payload.message}\n\n${fieldList}` },
+    };
+  }
+
+  return { messaging_product: 'whatsapp', to, type: 'text', text: { body: message.content } };
+}
+
 /**
  * Runs entirely outside the API's NestJS DI/CLS context, so it uses the raw
  * (unscoped) Prisma client and filters by tenantId/ids manually.
@@ -43,25 +111,7 @@ export async function processWhatsAppOutboundJob(data: ChannelOutboundJobData): 
     return;
   }
 
-  // Phase 17: Campaigns/Templates — a TEMPLATE message carries a pre-built
-  // Graph API `template` object (snapshotted at creation time, see
-  // Message.templatePayload), sent instead of a plain-text payload. This is
-  // the only branch point; everything else (connection lookup, retry/DLQ via
-  // the thrown Error below) is shared with ordinary text sends.
-  const body =
-    message.type === 'TEMPLATE' && message.templatePayload
-      ? {
-          messaging_product: 'whatsapp',
-          to: conversation.contactChannel.externalId,
-          type: 'template',
-          template: message.templatePayload,
-        }
-      : {
-          messaging_product: 'whatsapp',
-          to: conversation.contactChannel.externalId,
-          type: 'text',
-          text: { body: message.content },
-        };
+  const body = buildOutboundBody(message, conversation.contactChannel.externalId);
 
   const response = await fetch(
     `https://graph.facebook.com/${GRAPH_API_VERSION}/${connection.externalAccountId}/messages`,

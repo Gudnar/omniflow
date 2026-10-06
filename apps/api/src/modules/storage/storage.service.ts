@@ -66,6 +66,14 @@ export class StorageService {
     return { url: `${publicBaseUrl()}/uploads/${namespace}/${tenantId}/${filename}` };
   }
 
+  // For server-generated images (QR codes, rendered receipts) that never
+  // went through Multer/an HTTP upload — same local-disk-today/S3-later
+  // storage as everything else here, just skipping the mimetype allowlist
+  // check since the caller controls the bytes, not an end user.
+  async savePngBuffer(tenantId: string, buffer: Buffer, namespace: string): Promise<{ url: string }> {
+    return this.writeBuffer(tenantId, namespace, 'png', buffer);
+  }
+
   async saveImage(
     tenantId: string,
     file: Express.Multer.File | undefined,

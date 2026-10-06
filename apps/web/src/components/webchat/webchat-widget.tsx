@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, X, Send } from 'lucide-react';
+import { MessageCircle, X, Send, Link2 } from 'lucide-react';
 import { apiGet, apiPost } from '@/lib/api-client';
 import { connectAsVisitor } from '@/lib/socket-client';
 import type { WebchatMessage } from '@/lib/types';
@@ -40,6 +40,9 @@ export function WebchatWidget({
   const [messages, setMessages] = useState<WebchatMessage[]>([]);
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
+  // Quick-reply buttons and forms are one-shot — once the visitor answers
+  // one, that same bubble shows as answered instead of staying clickable.
+  const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set());
   const socketRef = useRef<Socket | null>(null);
 
   const loadMessages = (s: WebchatSession) => {
@@ -81,23 +84,29 @@ export function WebchatWidget({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  const send = async () => {
-    if (!text.trim() || sending) return;
+  const sendContent = async (content: string, sourceMessageId?: string) => {
+    if (!content.trim() || sending) return;
     setSending(true);
-    const content = text;
-    setText('');
     try {
       const s = session ?? (await ensureSession());
       await apiPost(`/webchat/conversations/${s.conversationId}/messages`, undefined, {
         webchatToken: s.webchatToken,
         content,
       });
+      if (sourceMessageId) setAnsweredIds((prev) => new Set(prev).add(sourceMessageId));
       loadMessages(s);
     } catch (err) {
       console.error('Error sending webchat message:', err);
     } finally {
       setSending(false);
     }
+  };
+
+  const send = async () => {
+    if (!text.trim()) return;
+    const content = text;
+    setText('');
+    await sendContent(content);
   };
 
   if (!open) {
@@ -125,6 +134,67 @@ export function WebchatWidget({
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {messages.map((m) => {
           const isMine = m.direction === 'INBOUND';
+          const answered = answeredIds.has(m.id);
+
+          if (m.type === 'CTA' && m.ctaPayload) {
+            return (
+              <div key={m.id} className="flex justify-start">
+                <div className="max-w-[85%] w-full rounded-2xl shadow-sm overflow-hidden bg-white border border-gray-100">
+                  {m.content.replace(m.ctaPayload.url, '').trim() && (
+                    <p className="px-3 pt-2.5 pb-2 text-sm text-gray-800">{m.content.replace(m.ctaPayload.url, '').trim()}</p>
+                  )}
+                  <a
+                    href={m.ctaPayload.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold border-t border-gray-100"
+                    style={{ color: primaryColor }}
+                  >
+                    <Link2 className="w-3.5 h-3.5" />
+                    {m.ctaPayload.label}
+                  </a>
+                </div>
+              </div>
+            );
+          }
+
+          if (m.type === 'INTERACTIVE' && m.interactivePayload?.kind === 'quick_replies') {
+            const payload = m.interactivePayload;
+            return (
+              <div key={m.id} className="flex justify-start">
+                <div className="max-w-[85%] w-full rounded-2xl shadow-sm overflow-hidden bg-white border border-gray-100">
+                  <p className="px-3 pt-2.5 pb-2 text-sm text-gray-800">{payload.message}</p>
+                  <div className="flex flex-wrap gap-1.5 px-3 pb-3">
+                    {payload.options.map((opt) => (
+                      <button
+                        key={opt.id}
+                        disabled={answered || sending}
+                        onClick={() => sendContent(opt.label, m.id)}
+                        className="px-3 py-1.5 rounded-full border text-xs font-semibold disabled:opacity-50 transition"
+                        style={{ borderColor: primaryColor, color: primaryColor }}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (m.type === 'INTERACTIVE' && m.interactivePayload?.kind === 'form') {
+            return (
+              <InteractiveFormBubble
+                key={m.id}
+                payload={m.interactivePayload}
+                answered={answered}
+                sending={sending}
+                primaryColor={primaryColor}
+                onSubmit={(summary) => sendContent(summary, m.id)}
+              />
+            );
+          }
+
           return (
             <div key={m.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
               <div
@@ -155,6 +225,64 @@ export function WebchatWidget({
         >
           <Send className="w-4 h-4" />
         </button>
+      </div>
+    </div>
+  );
+}
+
+// Submitting builds one human-readable text summary ("Nombre: Juan\nEmail:
+// ...") sent as a normal INBOUND message — the backend has no separate
+// "form submission" concept, this is the intentional degrade-to-text path
+// (see onSubmit callers), so the submission reads naturally in the thread
+// and feeds the AI agent's context without new parsing logic downstream.
+function InteractiveFormBubble({
+  payload,
+  answered,
+  sending,
+  primaryColor,
+  onSubmit,
+}: {
+  payload: Extract<NonNullable<WebchatMessage['interactivePayload']>, { kind: 'form' }>;
+  answered: boolean;
+  sending: boolean;
+  primaryColor: string;
+  onSubmit: (summary: string) => void;
+}) {
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  const canSubmit = payload.fields.every((f) => (values[f.id] ?? '').trim().length > 0);
+
+  const submit = () => {
+    if (!canSubmit) return;
+    const summary = payload.fields.map((f) => `${f.label}: ${(values[f.id] ?? '').trim()}`).join('\n');
+    onSubmit(summary);
+  };
+
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[90%] w-full rounded-2xl shadow-sm overflow-hidden bg-white border border-gray-100">
+        <p className="px-3 pt-2.5 pb-2 text-sm text-gray-800">{payload.message}</p>
+        <div className="px-3 pb-3 space-y-2">
+          {payload.fields.map((f) => (
+            <input
+              key={f.id}
+              type={f.fieldType === 'number' ? 'number' : f.fieldType === 'email' ? 'email' : f.fieldType === 'tel' ? 'tel' : 'text'}
+              placeholder={f.label}
+              disabled={answered}
+              value={values[f.id] ?? ''}
+              onChange={(e) => setValues((prev) => ({ ...prev, [f.id]: e.target.value }))}
+              className="w-full px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs disabled:opacity-50"
+            />
+          ))}
+          <button
+            onClick={submit}
+            disabled={answered || sending || !canSubmit}
+            className="w-full py-2 rounded-lg text-white text-xs font-semibold disabled:opacity-50"
+            style={{ backgroundColor: primaryColor }}
+          >
+            {payload.submitLabel}
+          </button>
+        </div>
       </div>
     </div>
   );

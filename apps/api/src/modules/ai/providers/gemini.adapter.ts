@@ -11,6 +11,31 @@ function splitSystemPrompt(messages: LlmMessage[]): { system?: string; rest: Llm
   return { system: systemMessages.map((m) => m.content).join('\n\n') || undefined, rest };
 }
 
+function safeParse(json: string): unknown {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return {};
+  }
+}
+
+// Gemini has its own function-calling shape: a model turn with a function
+// call is a `functionCall` part (role "model"), and its result is a
+// `functionResponse` part on a turn with role "function" — matched by
+// function NAME, not a call id (Gemini's API has no id concept here, unlike
+// OpenAI/Anthropic).
+function toGeminiContents(messages: LlmMessage[]): any[] {
+  return messages.map((m) => {
+    if (m.role === 'assistant' && m.toolCalls?.length) {
+      return { role: 'model', parts: m.toolCalls.map((tc) => ({ functionCall: { name: tc.name, args: safeParse(tc.arguments) } })) };
+    }
+    if (m.role === 'tool') {
+      return { role: 'function', parts: [{ functionResponse: { name: m.toolName ?? '', response: { result: m.content } } }] };
+    }
+    return { role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] };
+  });
+}
+
 @Injectable()
 export class GeminiAdapter implements LlmAdapter {
   async complete(params: LlmCompletionParams): Promise<LlmCompletionResult> {
@@ -26,7 +51,7 @@ export class GeminiAdapter implements LlmAdapter {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          contents: rest.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: m.content }] })),
+          contents: toGeminiContents(rest),
           ...(system && { systemInstruction: { parts: [{ text: system }] } }),
           generationConfig: { temperature: params.temperature, maxOutputTokens: params.maxTokens },
           ...(params.tools?.length && {
@@ -44,9 +69,13 @@ export class GeminiAdapter implements LlmAdapter {
     const data: any = await response.json();
     const parts: any[] = data.candidates?.[0]?.content?.parts ?? [];
     const textContent = parts.filter((p) => typeof p.text === 'string').map((p) => p.text).join('');
+    // Gemini gives no call id — synthesized here so the canonical LlmToolCall
+    // shape (shared with OpenAI/Anthropic, which do have real ids) still
+    // round-trips through AiReplyService's orchestration loop; toGeminiContents
+    // above never reads it back (it matches by function name instead).
     const toolCalls = parts
       .filter((p) => p.functionCall)
-      .map((p) => ({ name: p.functionCall.name, arguments: JSON.stringify(p.functionCall.args ?? {}) }));
+      .map((p, i) => ({ id: `call_${i}`, name: p.functionCall.name, arguments: JSON.stringify(p.functionCall.args ?? {}) }));
 
     return {
       content: textContent,

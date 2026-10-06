@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Star, Info, MoreVertical, Send, Mic, Link2, Copy } from 'lucide-react';
+import { Star, Info, MoreVertical, Send, Mic, Link2, Copy, ListChecks, X, Plus } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost } from '@/lib/api-client';
@@ -25,6 +25,16 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
   const [sending, setSending] = useState(false);
   const [webLink, setWebLink] = useState<string | null>(null);
   const [generatingLink, setGeneratingLink] = useState(false);
+  const [showQuickRepliesModal, setShowQuickRepliesModal] = useState(false);
+  const [quickRepliesForm, setQuickRepliesForm] = useState({ message: '', options: ['', ''] });
+  const [sendingQuickReplies, setSendingQuickReplies] = useState(false);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [formBuilder, setFormBuilder] = useState({
+    message: '',
+    submitLabel: '',
+    fields: [{ label: '', fieldType: 'text' as 'text' | 'email' | 'tel' | 'number' }],
+  });
+  const [sendingForm, setSendingForm] = useState(false);
 
   useEffect(() => {
     if (!conversation) {
@@ -99,6 +109,47 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
       toast.error(err.message ?? 'No se pudo enviar el mensaje');
     } finally {
       setSending(false);
+    }
+  };
+
+  const sendQuickReplies = async () => {
+    if (!conversation) return;
+    const options = quickRepliesForm.options.map((o) => o.trim()).filter(Boolean);
+    if (!quickRepliesForm.message.trim() || options.length < 2) return;
+    setSendingQuickReplies(true);
+    try {
+      const created = await apiPost<Message>(`/conversations/${conversation.id}/messages/quick-replies`, tokens?.accessToken, {
+        message: quickRepliesForm.message.trim(),
+        options,
+      });
+      setMessages((prev) => [...prev, created]);
+      setShowQuickRepliesModal(false);
+      setQuickRepliesForm({ message: '', options: ['', ''] });
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudieron enviar los botones');
+    } finally {
+      setSendingQuickReplies(false);
+    }
+  };
+
+  const sendForm = async () => {
+    if (!conversation) return;
+    const fields = formBuilder.fields.filter((f) => f.label.trim());
+    if (!formBuilder.message.trim() || fields.length < 1) return;
+    setSendingForm(true);
+    try {
+      const created = await apiPost<Message>(`/conversations/${conversation.id}/messages/form`, tokens?.accessToken, {
+        message: formBuilder.message.trim(),
+        fields: fields.map((f) => ({ label: f.label.trim(), fieldType: f.fieldType })),
+        submitLabel: formBuilder.submitLabel.trim() || undefined,
+      });
+      setMessages((prev) => [...prev, created]);
+      setShowFormModal(false);
+      setFormBuilder({ message: '', submitLabel: '', fields: [{ label: '', fieldType: 'text' }] });
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo enviar el formulario');
+    } finally {
+      setSendingForm(false);
     }
   };
 
@@ -196,7 +247,6 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
 
           if (m.type === 'CTA' && m.ctaPayload) {
             const intro = m.content.replace(m.ctaPayload.url, '').trim();
-            const label = m.ctaPayload.action === 'BOOKING' ? 'Reservar cita' : 'Ir a la tienda';
             return (
               <div key={m.id} className="flex justify-end">
                 <div className="max-w-md bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
@@ -206,8 +256,41 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
                   </div>
                   {intro && <p className="text-sm">{intro}</p>}
                   <a href={m.ctaPayload.url} target="_blank" rel="noreferrer" className="block text-sm underline text-blue-100 mt-1">
-                    {label}
+                    {m.ctaPayload.label}
                   </a>
+                  <p className="text-[10px] text-right mt-1 text-blue-100">
+                    {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            );
+          }
+
+          if (m.type === 'INTERACTIVE' && m.interactivePayload) {
+            const payload = m.interactivePayload;
+            return (
+              <div key={m.id} className="flex justify-end">
+                <div className="max-w-md bg-blue-600 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 shadow-sm">
+                  <div className="flex items-center gap-1.5 mb-1 opacity-80">
+                    <ListChecks className="w-3 h-3" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wide">
+                      {payload.kind === 'quick_replies' ? 'Botones de respuesta rápida' : 'Formulario'}
+                    </span>
+                  </div>
+                  <p className="text-sm">{payload.message}</p>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {payload.kind === 'quick_replies'
+                      ? payload.options.map((o) => (
+                          <span key={o.id} className="text-xs font-medium px-2 py-1 rounded-full bg-white/15">
+                            {o.label}
+                          </span>
+                        ))
+                      : payload.fields.map((f) => (
+                          <span key={f.id} className="text-xs font-medium px-2 py-1 rounded-full bg-white/15">
+                            {f.label}
+                          </span>
+                        ))}
+                  </div>
                   <p className="text-[10px] text-right mt-1 text-blue-100">
                     {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
@@ -294,6 +377,25 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
           </button>
         </div>
 
+        {messageTab === 'message' && (
+          <div className="flex items-center gap-1 mb-2">
+            <button
+              onClick={() => setShowQuickRepliesModal(true)}
+              className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition"
+            >
+              <ListChecks className="w-3.5 h-3.5" /> Botones rápidos
+            </button>
+            {channel === 'webchat' && (
+              <button
+                onClick={() => setShowFormModal(true)}
+                className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 px-2.5 py-1.5 rounded-lg hover:bg-gray-100 transition"
+              >
+                <ListChecks className="w-3.5 h-3.5" /> Formulario
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="flex items-end gap-3">
           <div className="flex-1 border border-gray-300 rounded-xl px-4 py-3 focus-within:ring-2 focus-within:ring-blue-500">
             <input
@@ -313,6 +415,151 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
           </button>
         </div>
       </div>
+
+      <Modal open={showQuickRepliesModal} onClose={() => setShowQuickRepliesModal(false)} title="Enviar botones de respuesta rápida">
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Mensaje</label>
+            <input
+              value={quickRepliesForm.message}
+              onChange={(e) => setQuickRepliesForm({ ...quickRepliesForm, message: e.target.value })}
+              placeholder="Ej. ¿Querés retiro o envío?"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Opciones (2 a 3)</label>
+            <div className="space-y-2">
+              {quickRepliesForm.options.map((opt, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={opt}
+                    onChange={(e) => {
+                      const options = [...quickRepliesForm.options];
+                      options[i] = e.target.value;
+                      setQuickRepliesForm({ ...quickRepliesForm, options });
+                    }}
+                    placeholder={`Opción ${i + 1}`}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                  {quickRepliesForm.options.length > 2 && (
+                    <button
+                      onClick={() => setQuickRepliesForm({ ...quickRepliesForm, options: quickRepliesForm.options.filter((_, idx) => idx !== i) })}
+                      className="p-1.5 text-gray-400 hover:text-red-500"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {quickRepliesForm.options.length < 3 && (
+              <button
+                onClick={() => setQuickRepliesForm({ ...quickRepliesForm, options: [...quickRepliesForm.options, ''] })}
+                className="flex items-center gap-1 text-xs font-medium text-blue-600 mt-2"
+              >
+                <Plus className="w-3.5 h-3.5" /> Agregar opción
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button onClick={() => setShowQuickRepliesModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 font-medium text-sm">
+            Cancelar
+          </button>
+          <button
+            onClick={sendQuickReplies}
+            disabled={sendingQuickReplies || !quickRepliesForm.message.trim() || quickRepliesForm.options.filter((o) => o.trim()).length < 2}
+            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm"
+          >
+            Enviar
+          </button>
+        </div>
+      </Modal>
+
+      <Modal open={showFormModal} onClose={() => setShowFormModal(false)} title="Enviar formulario">
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Mensaje</label>
+            <input
+              value={formBuilder.message}
+              onChange={(e) => setFormBuilder({ ...formBuilder, message: e.target.value })}
+              placeholder="Ej. Completa tus datos para continuar"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Campos (hasta 6)</label>
+            <div className="space-y-2">
+              {formBuilder.fields.map((f, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <input
+                    value={f.label}
+                    onChange={(e) => {
+                      const fields = [...formBuilder.fields];
+                      fields[i] = { ...fields[i], label: e.target.value };
+                      setFormBuilder({ ...formBuilder, fields });
+                    }}
+                    placeholder={`Campo ${i + 1} (ej. Nombre)`}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                  <select
+                    value={f.fieldType}
+                    onChange={(e) => {
+                      const fields = [...formBuilder.fields];
+                      fields[i] = { ...fields[i], fieldType: e.target.value as typeof f.fieldType };
+                      setFormBuilder({ ...formBuilder, fields });
+                    }}
+                    className="px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                  >
+                    <option value="text">Texto</option>
+                    <option value="email">Email</option>
+                    <option value="tel">Teléfono</option>
+                    <option value="number">Número</option>
+                  </select>
+                  {formBuilder.fields.length > 1 && (
+                    <button
+                      onClick={() => setFormBuilder({ ...formBuilder, fields: formBuilder.fields.filter((_, idx) => idx !== i) })}
+                      className="p-1.5 text-gray-400 hover:text-red-500"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {formBuilder.fields.length < 6 && (
+              <button
+                onClick={() => setFormBuilder({ ...formBuilder, fields: [...formBuilder.fields, { label: '', fieldType: 'text' }] })}
+                className="flex items-center gap-1 text-xs font-medium text-blue-600 mt-2"
+              >
+                <Plus className="w-3.5 h-3.5" /> Agregar campo
+              </button>
+            )}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Texto del botón de enviar (opcional)</label>
+            <input
+              value={formBuilder.submitLabel}
+              onChange={(e) => setFormBuilder({ ...formBuilder, submitLabel: e.target.value })}
+              placeholder="Enviar"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button onClick={() => setShowFormModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 font-medium text-sm">
+            Cancelar
+          </button>
+          <button
+            onClick={sendForm}
+            disabled={sendingForm || !formBuilder.message.trim() || formBuilder.fields.filter((f) => f.label.trim()).length < 1}
+            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm"
+          >
+            Enviar
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

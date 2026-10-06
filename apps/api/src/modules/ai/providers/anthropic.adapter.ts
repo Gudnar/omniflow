@@ -13,6 +13,47 @@ function splitSystemPrompt(messages: LlmMessage[]): { system?: string; rest: Llm
   return { system: systemMessages.map((m) => m.content).join('\n\n') || undefined, rest };
 }
 
+// Anthropic has no flat 'tool' role: a tool call is a `tool_use` content
+// block on an assistant turn, and its result is a `tool_result` block on the
+// NEXT user turn — and when an assistant turn called several tools at once,
+// all their results must come back bundled into a single user message (not
+// one message per result), so consecutive 'tool' messages are grouped here.
+function toAnthropicMessages(messages: LlmMessage[]): any[] {
+  const out: any[] = [];
+  for (const m of messages) {
+    if (m.role === 'assistant' && m.toolCalls?.length) {
+      out.push({
+        role: 'assistant',
+        content: [
+          ...(m.content ? [{ type: 'text', text: m.content }] : []),
+          ...m.toolCalls.map((tc) => ({ type: 'tool_use', id: tc.id, name: tc.name, input: safeParse(tc.arguments) })),
+        ],
+      });
+      continue;
+    }
+    if (m.role === 'tool') {
+      const last = out[out.length - 1];
+      const block = { type: 'tool_result', tool_use_id: m.toolCallId, content: m.content };
+      if (last?.role === 'user' && Array.isArray(last.content) && last.content[0]?.type === 'tool_result') {
+        last.content.push(block);
+      } else {
+        out.push({ role: 'user', content: [block] });
+      }
+      continue;
+    }
+    out.push({ role: m.role, content: m.content });
+  }
+  return out;
+}
+
+function safeParse(json: string): unknown {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return {};
+  }
+}
+
 @Injectable()
 export class AnthropicAdapter implements LlmAdapter {
   async complete(params: LlmCompletionParams): Promise<LlmCompletionResult> {
@@ -34,7 +75,7 @@ export class AnthropicAdapter implements LlmAdapter {
         max_tokens: params.maxTokens,
         temperature: params.temperature,
         ...(system && { system }),
-        messages: rest.map((m) => ({ role: m.role, content: m.content })),
+        messages: toAnthropicMessages(rest),
         ...(params.tools?.length && {
           tools: params.tools.map((t) => ({ name: t.name, description: t.description, input_schema: t.parameters })),
         }),
@@ -51,7 +92,7 @@ export class AnthropicAdapter implements LlmAdapter {
     const textContent = blocks.filter((b) => b.type === 'text').map((b) => b.text).join('');
     const toolCalls = blocks
       .filter((b) => b.type === 'tool_use')
-      .map((b) => ({ name: b.name, arguments: JSON.stringify(b.input ?? {}) }));
+      .map((b) => ({ id: b.id, name: b.name, arguments: JSON.stringify(b.input ?? {}) }));
 
     return {
       content: textContent,

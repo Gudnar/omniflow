@@ -24,6 +24,7 @@ describe('BookingStorefrontService', () => {
     appointmentsService = {
       getAvailability: jest.fn().mockResolvedValue([]),
       create: jest.fn().mockResolvedValue({ id: 'a1' }),
+      createGroup: jest.fn().mockResolvedValue([{ id: 'a1' }, { id: 'a2' }]),
     };
     bookingServicesService = {
       list: jest.fn().mockResolvedValue([
@@ -92,6 +93,41 @@ describe('BookingStorefrontService', () => {
         branchId: 'b1',
         serviceIds: ['svc1'],
         startAt: '2099-06-15T09:00:00.000Z',
+        commerceSessionId: 's1',
+      });
+    });
+  });
+
+  describe('bookAppointmentGroup', () => {
+    it('rejects booking for a date before the branch minBookingLeadDays', async () => {
+      const today = new Date().toISOString().slice(0, 10);
+      await expect(
+        service.bookAppointmentGroup('tok', {
+          startAt: `${today}T09:00:00.000Z`,
+          patients: [{ patientName: 'Juan', serviceId: 'svc1' }],
+        } as any),
+      ).rejects.toThrow(ValidationError);
+      expect(appointmentsService.createGroup).not.toHaveBeenCalled();
+    });
+
+    it('delegates to AppointmentsService.createGroup with contactId/branchId resolved from the session', async () => {
+      await service.bookAppointmentGroup('tok', {
+        startAt: '2099-06-15T09:00:00.000Z',
+        patients: [
+          { patientName: 'Juan', serviceId: 'svc1' },
+          { patientName: 'Ana', serviceId: 'svc1' },
+        ],
+      } as any);
+
+      expect(appointmentsService.createGroup).toHaveBeenCalledWith({
+        contactId: 'c1',
+        branchId: 'b1',
+        startAt: '2099-06-15T09:00:00.000Z',
+        patients: [
+          { patientName: 'Juan', serviceIds: ['svc1'] },
+          { patientName: 'Ana', serviceIds: ['svc1'] },
+        ],
+        commerceSessionId: 's1',
       });
     });
   });

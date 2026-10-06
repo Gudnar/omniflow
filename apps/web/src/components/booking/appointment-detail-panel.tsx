@@ -37,15 +37,18 @@ export function AppointmentDetailPanel({
   appointmentId,
   onClose,
   onChanged,
+  onSelectAppointment,
 }: {
   appointmentId: string;
   onClose: () => void;
   onChanged: () => void;
+  onSelectAppointment?: (id: string) => void;
 }) {
   const { tokens } = useAuth();
   const toast = useToast();
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [history, setHistory] = useState<AppointmentStatusHistoryEntry[]>([]);
+  const [groupSiblings, setGroupSiblings] = useState<Appointment[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ startAt: '', notes: '' });
@@ -57,6 +60,13 @@ export function AppointmentDetailPanel({
     ]);
     setAppointment(apptData);
     setHistory(historyData);
+    if (apptData.groupId) {
+      apiGet<Appointment[]>(`/appointments?groupId=${apptData.groupId}`, tokens?.accessToken)
+        .then(setGroupSiblings)
+        .catch(() => setGroupSiblings(null));
+    } else {
+      setGroupSiblings(null);
+    }
   };
 
   useEffect(() => {
@@ -141,7 +151,8 @@ export function AppointmentDetailPanel({
     <div className="bg-white rounded-xl border border-gray-200 flex flex-col overflow-hidden max-h-[calc(100vh-8rem)]">
       <div className="flex items-center justify-between p-5 border-b border-gray-100">
         <div>
-          <p className="text-base font-bold text-gray-900">{appointment.contact.name}</p>
+          <p className="text-base font-bold text-gray-900">{appointment.patientName ?? appointment.contact.name}</p>
+          {appointment.patientName && <p className="text-xs text-gray-500">Reservado por {appointment.contact.name}</p>}
           <p className="text-xs text-gray-400">{formatZonedDateTime(appointment.startAt, appointment.branch.timezone)}</p>
         </div>
         <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 transition shrink-0">
@@ -158,6 +169,32 @@ export function AppointmentDetailPanel({
             {appointment.currency} {appointment.total.toFixed(2)}
           </p>
         </div>
+
+        {groupSiblings && groupSiblings.length > 1 && (
+          <div>
+            <h4 className="text-sm font-bold text-gray-900 mb-3">Reserva familiar ({groupSiblings.length} personas)</h4>
+            <div className="space-y-1.5">
+              {groupSiblings.map((sib) => (
+                <button
+                  key={sib.id}
+                  onClick={() => onSelectAppointment?.(sib.id)}
+                  disabled={sib.id === appointment.id}
+                  className={`w-full flex items-center justify-between text-sm rounded-lg px-3 py-2 text-left transition ${
+                    sib.id === appointment.id ? 'bg-blue-50 cursor-default' : 'bg-gray-50 hover:bg-gray-100'
+                  }`}
+                >
+                  <span className="font-medium text-gray-900">{sib.patientName ?? sib.contact.name}</span>
+                  <span className="flex items-center gap-2 text-gray-500">
+                    {formatZonedDateTime(sib.startAt, sib.branch.timezone)}
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[sib.status]}`}>
+                      {STATUS_LABELS[sib.status]}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-wrap gap-2">
           {nextSteps.map((step) => (

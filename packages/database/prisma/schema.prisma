@@ -69,6 +69,16 @@ model Tenant {
   notifyOnOrderPendingApproval Boolean @default(true)
   notifyOnAppointmentPendingApproval Boolean @default(true)
 
+  // Automatic post-confirmation "ticket" images sent into the originating
+  // conversation (ConfirmationImagesService) — a QR code encoding a plain-text
+  // summary, and/or a rendered receipt image. Independently toggleable per
+  // flow (booking vs order) and per image type, since a tenant may want one
+  // without the other.
+  sendAppointmentQrCode Boolean @default(true)
+  sendAppointmentReceiptImage Boolean @default(true)
+  sendOrderQrCode Boolean @default(true)
+  sendOrderReceiptImage Boolean @default(true)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -526,12 +536,17 @@ enum MessageType {
   // AiTranscriptionService transcribes it, content is overwritten with the
   // transcript text, same row (no separate "transcript" model).
   AUDIO
-  // Phase 14 (partial): an OUTBOUND, agent-initiated interactive message —
-  // the AI agent's send_storefront_link tool decided the customer showed
-  // buying/booking intent and generated a real link (see
-  // Message.ctaPayload). Never client-authored: AiReplyService is the only
-  // writer with a non-empty ctaPayload.
+  // An OUTBOUND, agent-initiated interactive message — the AI agent's
+  // send_storefront_link tool decided the customer showed buying/booking
+  // intent and generated a real link (see Message.ctaPayload). Never
+  // client-authored: AiReplyService is the only writer with a non-empty
+  // ctaPayload.
   CTA
+  // Phase 14: AI Commerce (conversation tools) — an OUTBOUND quick-reply
+  // button set or inline form, sent either by the AI agent
+  // (send_quick_replies/send_form tools) or a human operator from the
+  // conversation panel. See Message.interactivePayload.
+  INTERACTIVE
 }
 
 model ContactChannel {
@@ -648,6 +663,14 @@ model Message {
   // a raw string the LLM wrote itself (same snapshot rationale as
   // templatePayload above).
   ctaPayload Json?
+
+  // Set only when type is INTERACTIVE:
+  //   { kind: 'quick_replies', message: string, options: {id,label}[] }
+  //   { kind: 'form', message: string, fields: {id,label,fieldType}[], submitLabel: string }
+  // `kind: 'form'` is webchat-only (gated before send — WhatsApp's regular
+  // interactive messages have no multi-field form type; that's the separate
+  // "Flows" product, out of scope here).
+  interactivePayload Json?
 
   createdAt DateTime @default(now())
 
@@ -1119,6 +1142,16 @@ model Product {
   description String?
   status ProductStatus @default(DRAFT)
 
+  // Products that need lead time before they're ready — cold-chain
+  // medication, made-to-order food, frozen goods. Only surfaced to the
+  // customer for PICKUP (CartsService.checkout() snapshots these onto
+  // OrderItem; the storefront/receipts show them only when
+  // fulfillmentType === 'PICKUP' — a delivery/shipping order already has
+  // transit time covering this, informing about it there would be noise).
+  requiresPreparation Boolean @default(false)
+  preparationReason String?
+  preparationMinutes Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1554,6 +1587,12 @@ model OrderItem {
   productNameSnapshot String
   skuSnapshot String
 
+  // Snapshot of Product.requiresPreparation/preparationReason/preparationMinutes
+  // at purchase time — same rationale as the name/SKU snapshots above.
+  requiresPreparationSnapshot Boolean @default(false)
+  preparationReasonSnapshot String?
+  preparationMinutesSnapshot Int?
+
   quantity Int
   unitPrice Decimal @db.Decimal(10, 2)
   discount Decimal @default(0) @db.Decimal(10, 2)
@@ -1795,6 +1834,17 @@ model Appointment {
   status AppointmentStatus @default(CONFIRMED)
   notes String?
 
+  // Who this specific appointment is FOR, when it differs from the booking
+  // contact — e.g. a parent (contactId) booking a pediatric dental checkup
+  // for a child who has no Contact record of their own. Null means "the
+  // contact themself", same as before this field existed.
+  patientName String?
+  // Appointments created together via AppointmentsService.createGroup() (one
+  // parent booking sequential turns for several patients) share this id —
+  // purely a grouping label, each Appointment is still otherwise independent
+  // (its own status, its own resource/time slot).
+  groupId String?
+
   subtotal Decimal @db.Decimal(10, 2)
   total Decimal @db.Decimal(10, 2)
   currency String
@@ -1811,6 +1861,7 @@ model Appointment {
 
   @@index([tenantId, branchId, startAt])
   @@index([tenantId, contactId])
+  @@index([groupId])
 }
 
 model AppointmentService {
@@ -2417,6 +2468,15 @@ model AiAgent {
   escalationKeywords String[] @default([])
 
   maxTokens Int @default(500)
+
+  // Phase 14: AI Commerce — which of the registered ecommerce/booking tools
+  // (see apps/api/.../ai/tools/registry.ts for the names) this agent may
+  // call. Same "plain scalar array, fixed tiny-ish domain, no per-pairing
+  // data" rationale as `channels` above — an admin with `ai.manage` picks
+  // this list; the running agent can never call anything outside it, no
+  // matter what the model tries. `send_storefront_link` isn't in this list;
+  // it's offered unconditionally based on store capability, same as before.
+  enabledTools String[] @default([])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

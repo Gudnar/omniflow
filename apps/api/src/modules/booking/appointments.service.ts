@@ -1,12 +1,15 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundError, ValidationError, zonedDateTimeToUtc, utcToZonedDateTime } from '@omniflow/utils';
 import { EventsService } from '../events/events.service';
 import { TenantContextService } from '../tenant-context/tenant-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ConfirmationImagesService } from '../confirmation-images/confirmation-images.service';
 import {
   AvailabilityQueryDto,
   CreateAppointmentDto,
+  CreateAppointmentGroupDto,
   RescheduleAppointmentDto,
   ListAppointmentsQueryDto,
   UpdateAppointmentStatusDto,
@@ -111,6 +114,7 @@ export class AppointmentsService {
     private eventsService: EventsService,
     private tenantContext: TenantContextService,
     private notificationsService: NotificationsService,
+    private confirmationImagesService: ConfirmationImagesService,
   ) {}
 
   async list(query: ListAppointmentsQueryDto) {
@@ -119,9 +123,12 @@ export class AppointmentsService {
         ...(query.status && { status: query.status }),
         ...(query.branchId && { branchId: query.branchId }),
         ...(query.contactId && { contactId: query.contactId }),
+        ...(query.groupId && { groupId: query.groupId }),
       },
       include: APPOINTMENT_INCLUDE,
-      orderBy: { startAt: 'desc' },
+      // Family/group bookings read naturally in turn order (earliest first);
+      // the default unfiltered list stays newest-first.
+      orderBy: { startAt: query.groupId ? 'asc' : 'desc' },
     });
     return appointments.map(serializeAppointment);
   }
@@ -313,7 +320,13 @@ export class AppointmentsService {
     const tenant = tenantId
       ? await this.prisma.client.tenant.findUnique({
           where: { id: tenantId },
-          select: { appointmentApprovalMode: true, notifyOnAppointmentPendingApproval: true },
+          select: {
+            name: true,
+            appointmentApprovalMode: true,
+            notifyOnAppointmentPendingApproval: true,
+            sendAppointmentQrCode: true,
+            sendAppointmentReceiptImage: true,
+          },
         })
       : null;
     const requiresManualApproval = tenant?.appointmentApprovalMode === 'MANUAL';
@@ -340,6 +353,9 @@ export class AppointmentsService {
           contactId: dto.contactId,
           branchId: dto.branchId,
           addressId: dto.addressId,
+          commerceSessionId: dto.commerceSessionId,
+          patientName: dto.patientName,
+          groupId: dto.groupId,
           notes: dto.notes,
           startAt: firstStart,
           endAt: lastEnd,
@@ -375,6 +391,15 @@ export class AppointmentsService {
       appointment.contactId,
     );
 
+    if (
+      !dto.skipConfirmationImages &&
+      tenantId &&
+      dto.commerceSessionId &&
+      (tenant?.sendAppointmentQrCode || tenant?.sendAppointmentReceiptImage)
+    ) {
+      await this.sendConfirmationImages(tenantId, dto.commerceSessionId, appointment, tenant, timeZone);
+    }
+
     if (requiresManualApproval) {
       await this.eventsService.emit(
         'appointment.pending_approval',
@@ -392,6 +417,143 @@ export class AppointmentsService {
     }
 
     return serializeAppointment(appointment);
+  }
+
+  // One parent/contact booking sequential turns for several patients (e.g. a
+  // pediatric dental checkup for 3 siblings) — each patient gets their own
+  // real Appointment, one right after another on whichever resource create()
+  // finds available for them (not necessarily the same one), never a shared
+  // slot. Each create() call has its own full validation/transaction/retry
+  // safety already; this only sequences them and, if any patient can't be
+  // fit, cancels the ones already booked rather than leaving a half-built
+  // family booking active — the customer sees one clear failure, not a
+  // confusing partial success.
+  async createGroup(dto: CreateAppointmentGroupDto) {
+    const groupId = randomUUID();
+    const created: any[] = [];
+    let cursor = dto.startAt;
+
+    try {
+      for (const patient of dto.patients) {
+        const appointment = await this.create({
+          contactId: dto.contactId,
+          branchId: dto.branchId,
+          serviceIds: patient.serviceIds,
+          resourceIds: patient.resourceIds,
+          startAt: cursor,
+          addressId: dto.addressId,
+          notes: dto.notes,
+          commerceSessionId: dto.commerceSessionId,
+          patientName: patient.patientName,
+          groupId,
+          skipConfirmationImages: true,
+        } as any);
+        created.push(appointment);
+        cursor = new Date(appointment.endAt).toISOString();
+      }
+    } catch (error) {
+      for (const appointment of created) {
+        await this.cancel(appointment.id, undefined as any, {
+          note: 'Reserva familiar incompleta: un horario dejó de estar disponible',
+        }).catch(() => undefined);
+      }
+      throw error;
+    }
+
+    const tenantId = this.tenantContext.getTenantId();
+    if (tenantId && dto.commerceSessionId) {
+      const tenant = await this.prisma.client.tenant.findUnique({
+        where: { id: tenantId },
+        select: { name: true, sendAppointmentQrCode: true, sendAppointmentReceiptImage: true },
+      });
+      if (tenant?.sendAppointmentQrCode || tenant?.sendAppointmentReceiptImage) {
+        await this.sendGroupConfirmationImages(tenantId, dto.commerceSessionId, created, tenant);
+      }
+    }
+
+    return created;
+  }
+
+  private async sendGroupConfirmationImages(tenantId: string, commerceSessionId: string, appointments: any[], tenant: any) {
+    const session = await this.prisma.client.commerceSession.findUnique({
+      where: { id: commerceSessionId },
+      select: { conversationId: true },
+    });
+    if (!session?.conversationId) return;
+
+    const branch = await this.prisma.client.branch.findUnique({ where: { id: appointments[0].branchId }, select: { timezone: true, name: true } });
+    const timeZone = branch?.timezone ?? 'UTC';
+    const formatWhen = (d: any) => new Date(d).toLocaleString('es-BO', { timeZone, dateStyle: 'medium', timeStyle: 'short' });
+
+    const qrText = [
+      'Reserva familiar confirmada',
+      `N°: ${appointments[0].id}`,
+      ...appointments.map((a) => `${a.patientName ?? 'Paciente'}: ${formatWhen(a.startAt)}`),
+      `Sucursal: ${branch?.name ?? ''}`,
+    ].join('\n');
+
+    const currency = appointments[0].currency;
+    const total = appointments.reduce((sum, a) => sum + Number(a.total), 0);
+
+    await this.confirmationImagesService.send({
+      tenantId,
+      conversationId: session.conversationId,
+      sendQrCode: !!tenant?.sendAppointmentQrCode,
+      sendReceiptImage: !!tenant?.sendAppointmentReceiptImage,
+      qrText,
+      receipt: {
+        businessName: tenant?.name ?? '',
+        title: 'Reserva familiar confirmada',
+        subtitle: `${appointments.length} paciente(s)`,
+        lines: appointments.map((a) => ({
+          label: `${a.patientName ?? 'Paciente'} — ${formatWhen(a.startAt)}`,
+          value: `${a.currency} ${Number(a.total).toFixed(2)}`,
+        })),
+        totalLabel: 'Total',
+        totalValue: `${currency} ${total.toFixed(2)}`,
+        footer: '¡Los esperamos!',
+      },
+    });
+  }
+
+  private async sendConfirmationImages(tenantId: string, commerceSessionId: string, appointment: any, tenant: any, timeZone: string) {
+    const session = await this.prisma.client.commerceSession.findUnique({
+      where: { id: commerceSessionId },
+      select: { conversationId: true },
+    });
+    if (!session?.conversationId) return;
+
+    const when = new Date(appointment.startAt).toLocaleString('es-BO', { timeZone, dateStyle: 'medium', timeStyle: 'short' });
+    const serviceNames = appointment.services.map((s: any) => s.serviceNameSnapshot).join(', ');
+
+    const qrText = [
+      'Cita confirmada',
+      `N°: ${appointment.id}`,
+      `Cliente: ${appointment.contact?.name ?? ''}`,
+      `Servicio: ${serviceNames}`,
+      `Fecha: ${when}`,
+      `Sucursal: ${appointment.branch?.name ?? ''}`,
+    ].join('\n');
+
+    await this.confirmationImagesService.send({
+      tenantId,
+      conversationId: session.conversationId,
+      sendQrCode: !!tenant?.sendAppointmentQrCode,
+      sendReceiptImage: !!tenant?.sendAppointmentReceiptImage,
+      qrText,
+      receipt: {
+        businessName: tenant?.name ?? '',
+        title: 'Cita confirmada',
+        subtitle: when,
+        lines: appointment.services.map((s: any) => ({
+          label: `${s.serviceNameSnapshot} (${s.durationMinutesSnapshot} min)`,
+          value: `${appointment.currency} ${Number(s.priceSnapshot).toFixed(2)}`,
+        })),
+        totalLabel: 'Total',
+        totalValue: `${appointment.currency} ${Number(appointment.total).toFixed(2)}`,
+        footer: '¡Te esperamos!',
+      },
+    });
   }
 
   async reschedule(id: string, dto: RescheduleAppointmentDto) {

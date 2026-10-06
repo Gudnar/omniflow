@@ -1,4 +1,4 @@
-import { IsString, MinLength, IsOptional, IsEnum, ValidateNested, IsArray } from 'class-validator';
+import { IsString, MinLength, IsOptional, IsEnum, ValidateNested, IsArray, IsBoolean, IsInt, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ProductStatus } from '@omniflow/database';
 import { CreateVariantDto } from './variant.dto';
@@ -23,6 +23,19 @@ export class CreateProductDto {
   @IsEnum(ProductStatus)
   @IsOptional()
   declare status?: ProductStatus;
+
+  @IsBoolean()
+  @IsOptional()
+  declare requiresPreparation?: boolean;
+
+  @IsString()
+  @IsOptional()
+  declare preparationReason?: string;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  declare preparationMinutes?: number;
 
   // Optional — if omitted, ProductsService creates one implicit default variant.
   @IsArray()
@@ -54,4 +67,17 @@ export class UpdateProductDto {
   @IsEnum(ProductStatus)
   @IsOptional()
   declare status?: ProductStatus;
+
+  @IsBoolean()
+  @IsOptional()
+  declare requiresPreparation?: boolean;
+
+  @IsString()
+  @IsOptional()
+  declare preparationReason?: string;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  declare preparationMinutes?: number;
 }

@@ -5,6 +5,7 @@ import { AppointmentsService } from './appointments.service';
 import {
   AvailabilityQueryDto,
   CreateAppointmentDto,
+  CreateAppointmentGroupDto,
   RescheduleAppointmentDto,
   ListAppointmentsQueryDto,
   UpdateAppointmentStatusDto,
@@ -57,6 +58,13 @@ export class AppointmentsController {
   @RequirePermission('appointments.manage')
   create(@Body() dto: CreateAppointmentDto) {
     return this.appointmentsService.create(dto);
+  }
+
+  @Post('group')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('appointments.manage')
+  createGroup(@Body() dto: CreateAppointmentGroupDto) {
+    return this.appointmentsService.createGroup(dto);
   }
 
   @Patch(':id')

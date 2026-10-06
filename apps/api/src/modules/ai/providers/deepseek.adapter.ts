@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ValidationError } from '@omniflow/utils';
 import { LlmAdapter, LlmCompletionParams, LlmCompletionResult } from './llm-adapter.types';
+import { toOpenAiMessages } from './openai.adapter';
 
 // DeepSeek's API is OpenAI-compatible (same request/response shape,
 // including tool calling) — same pattern as OpenAiAdapter, pointed at
@@ -21,7 +22,7 @@ export class DeepSeekAdapter implements LlmAdapter {
       },
       body: JSON.stringify({
         model: params.model,
-        messages: params.messages,
+        messages: toOpenAiMessages(params.messages),
         temperature: params.temperature,
         max_tokens: params.maxTokens,
         ...(params.tools?.length && {
@@ -38,6 +39,7 @@ export class DeepSeekAdapter implements LlmAdapter {
 
     const data: any = await response.json();
     const toolCalls = data.choices?.[0]?.message?.tool_calls?.map((tc: any) => ({
+      id: tc.id,
       name: tc.function.name,
       arguments: tc.function.arguments,
     }));
