@@ -53,6 +53,10 @@ export class RescheduleAppointmentDto {
   @IsString({ each: true })
   @IsOptional()
   declare resourceIds?: string[];
+
+  @IsString()
+  @IsOptional()
+  declare notes?: string;
 }
 
 export class ListAppointmentsQueryDto {

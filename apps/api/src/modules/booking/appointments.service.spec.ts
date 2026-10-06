@@ -362,6 +362,28 @@ describe('AppointmentsService', () => {
         data: { startAt: new Date('2026-01-06T09:00:00.000Z'), endAt: new Date('2026-01-06T10:00:00.000Z') },
       });
     });
+
+    it('updates notes alongside the time when given', async () => {
+      prisma.client.appointment.findUnique.mockResolvedValue(appt);
+      prisma.client.bookingResource.findUnique.mockResolvedValue({ id: 'r1', type: 'ROOM', userId: null });
+      prisma.client.bookingResourceSchedule.findMany.mockResolvedValue([{ startMinute: 0, endMinute: 1440 }]);
+      prisma.client.appointmentResource.findMany.mockResolvedValue([]);
+
+      await service.reschedule('a1', {
+        startAt: '2026-01-06T09:00:00.000Z',
+        endAt: '2026-01-06T10:00:00.000Z',
+        notes: 'Cliente pidió cambiar de horario',
+      } as any);
+
+      expect(tx.appointment.update).toHaveBeenCalledWith({
+        where: { id: 'a1' },
+        data: {
+          startAt: new Date('2026-01-06T09:00:00.000Z'),
+          endAt: new Date('2026-01-06T10:00:00.000Z'),
+          notes: 'Cliente pidió cambiar de horario',
+        },
+      });
+    });
   });
 
   describe('transition graph', () => {

@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Clock } from 'lucide-react';
+import { X, Clock, Pencil } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
-import { apiGet, apiPost } from '@/lib/api-client';
+import { apiGet, apiPost, apiPatch } from '@/lib/api-client';
 import type { Appointment, AppointmentStatus, AppointmentStatusHistoryEntry } from '@/lib/types';
 
 const STATUS_LABELS: Record<AppointmentStatus, string> = {
@@ -32,6 +32,15 @@ const NEXT_STEPS: Record<AppointmentStatus, AppointmentStatus[]> = {
   NO_SHOW: [],
 };
 
+// `<input type="datetime-local">` reads/writes local time with no timezone
+// suffix — converts an ISO string to that format for display, inverse of
+// `new Date(value).toISOString()` used when sending the edit back.
+function toLocalDatetimeInputValue(iso: string): string {
+  const d = new Date(iso);
+  const offsetMs = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16);
+}
+
 export function AppointmentDetailPanel({
   appointmentId,
   onClose,
@@ -46,6 +55,8 @@ export function AppointmentDetailPanel({
   const [appointment, setAppointment] = useState<Appointment | null>(null);
   const [history, setHistory] = useState<AppointmentStatusHistoryEntry[]>([]);
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ startAt: '', notes: '' });
 
   const refetch = async () => {
     const [apptData, historyData] = await Promise.all([
@@ -57,6 +68,7 @@ export function AppointmentDetailPanel({
   };
 
   useEffect(() => {
+    setEditing(false);
     refetch().catch((err) => console.error('Error fetching appointment:', err));
   }, [appointmentId, tokens]);
 
@@ -69,6 +81,35 @@ export function AppointmentDetailPanel({
       toast.success('Estado de la cita actualizado correctamente');
     } catch (err: any) {
       toast.error(err.message ?? 'Error al cambiar el estado');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const startEdit = () => {
+    if (!appointment) return;
+    setEditForm({ startAt: toLocalDatetimeInputValue(appointment.startAt), notes: appointment.notes ?? '' });
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    if (!appointment || !editForm.startAt) return;
+    setBusy(true);
+    try {
+      const durationMs = new Date(appointment.endAt).getTime() - new Date(appointment.startAt).getTime();
+      const newStartAt = new Date(editForm.startAt);
+      const newEndAt = new Date(newStartAt.getTime() + durationMs);
+      await apiPatch(`/appointments/${appointmentId}`, tokens?.accessToken, {
+        startAt: newStartAt.toISOString(),
+        endAt: newEndAt.toISOString(),
+        notes: editForm.notes,
+      });
+      setEditing(false);
+      await refetch();
+      onChanged();
+      toast.success('Cita actualizada correctamente');
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo actualizar la cita');
     } finally {
       setBusy(false);
     }
@@ -99,6 +140,9 @@ export function AppointmentDetailPanel({
 
   const nextSteps = NEXT_STEPS[appointment.status];
   const canCancel = appointment.status === 'PENDING' || appointment.status === 'CONFIRMED';
+  // Same eligibility the backend enforces for reschedule() — a terminal
+  // appointment (COMPLETED/CANCELLED/NO_SHOW) can't be moved.
+  const canEdit = canCancel;
   const isPending = appointment.status === 'PENDING';
 
   return (
@@ -142,6 +186,63 @@ export function AppointmentDetailPanel({
             >
               {isPending ? 'Rechazar cita' : 'Cancelar cita'}
             </button>
+          )}
+          {canEdit && !editing && (
+            <button
+              onClick={startEdit}
+              disabled={busy}
+              className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 disabled:opacity-50 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Editar cita
+            </button>
+          )}
+        </div>
+
+        <div>
+          <h4 className="text-sm font-bold text-gray-900 mb-3">Fecha, hora y notas</h4>
+          {editing ? (
+            <div className="space-y-3 bg-blue-50 rounded-lg p-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Fecha y hora de inicio</label>
+                <input
+                  type="datetime-local"
+                  value={editForm.startAt}
+                  onChange={(e) => setEditForm({ ...editForm, startAt: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                />
+                <p className="text-xs text-gray-400 mt-1">La duración total de la cita se mantiene igual.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Notas</label>
+                <textarea
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEditing(false)}
+                  disabled={busy}
+                  className="flex-1 px-3 py-2 border border-gray-300 disabled:opacity-50 rounded-lg text-sm font-medium text-gray-700 hover:bg-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveEdit}
+                  disabled={busy}
+                  className="flex-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg text-sm font-semibold"
+                >
+                  Guardar
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-gray-900 space-y-1">
+              <p>{new Date(appointment.startAt).toLocaleString()} → {new Date(appointment.endAt).toLocaleString()}</p>
+              {appointment.notes && <p className="text-gray-500">{appointment.notes}</p>}
+            </div>
           )}
         </div>
 

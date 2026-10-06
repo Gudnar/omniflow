@@ -406,7 +406,10 @@ export class AppointmentsService {
     }
 
     await this.prisma.client.$transaction(async (tx: any) => {
-      await tx.appointment.update({ where: { id }, data: { startAt: newStartAt, endAt: newEndAt } });
+      await tx.appointment.update({
+        where: { id },
+        data: { startAt: newStartAt, endAt: newEndAt, ...(dto.notes !== undefined && { notes: dto.notes }) },
+      });
       if (dto.resourceIds) {
         await tx.appointmentResource.deleteMany({ where: { appointmentId: id } });
         await tx.appointmentResource.createMany({

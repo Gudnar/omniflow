@@ -11,7 +11,7 @@ describe('BookingResourcesService', () => {
         bookingResource: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn(), update: jest.fn(), delete: jest.fn() },
         bookingServiceUser: { findFirst: jest.fn() },
         bookingResourceService: { create: jest.fn(), deleteMany: jest.fn() },
-        bookingResourceSchedule: { create: jest.fn(), findFirst: jest.fn(), delete: jest.fn() },
+        bookingResourceSchedule: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn(), delete: jest.fn() },
       },
     };
     service = new BookingResourcesService(prisma);
@@ -83,6 +83,31 @@ describe('BookingResourcesService', () => {
       await service.addScheduleEntry('r1', { dayOfWeek: 1, startMinute: 540, endMinute: 1080 } as any);
       expect(prisma.client.bookingResourceSchedule.create).toHaveBeenCalledWith({
         data: { resourceId: 'r1', dayOfWeek: 1, startMinute: 540, endMinute: 1080 },
+      });
+    });
+  });
+
+  describe('updateScheduleEntry', () => {
+    it('throws NotFoundError when the entry does not belong to the resource', async () => {
+      prisma.client.bookingResourceSchedule.findFirst.mockResolvedValue(null);
+      await expect(service.updateScheduleEntry('r1', 'e1', { startMinute: 600 } as any)).rejects.toThrow(NotFoundError);
+    });
+
+    it('rejects when the resulting endMinute is not after the resulting startMinute', async () => {
+      prisma.client.bookingResourceSchedule.findFirst.mockResolvedValue({ id: 'e1', resourceId: 'r1', dayOfWeek: 1, startMinute: 540, endMinute: 1080 });
+      await expect(service.updateScheduleEntry('r1', 'e1', { startMinute: 1100 } as any)).rejects.toThrow(ValidationError);
+      expect(prisma.client.bookingResourceSchedule.update).not.toHaveBeenCalled();
+    });
+
+    it('applies a partial update, falling back to the existing start/end when only one is given', async () => {
+      prisma.client.bookingResourceSchedule.findFirst.mockResolvedValue({ id: 'e1', resourceId: 'r1', dayOfWeek: 1, startMinute: 540, endMinute: 1080 });
+      prisma.client.bookingResource.findUnique.mockResolvedValue({ id: 'r1', type: 'ROOM' });
+
+      await service.updateScheduleEntry('r1', 'e1', { dayOfWeek: 2 } as any);
+
+      expect(prisma.client.bookingResourceSchedule.update).toHaveBeenCalledWith({
+        where: { id: 'e1' },
+        data: { dayOfWeek: 2 },
       });
     });
   });

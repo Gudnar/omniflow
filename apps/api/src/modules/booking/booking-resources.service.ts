@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConflictError, NotFoundError, ValidationError } from '@omniflow/utils';
-import { CreateResourceDto, UpdateResourceDto, CreateScheduleEntryDto } from './dto/resource.dto';
+import { CreateResourceDto, UpdateResourceDto, CreateScheduleEntryDto, UpdateScheduleEntryDto } from './dto/resource.dto';
 
 const RESOURCE_INCLUDE = {
   branch: { select: { id: true, name: true } },
@@ -87,6 +87,22 @@ export class BookingResourcesService {
       throw new ValidationError('endMinute must be after startMinute');
     }
     await this.prisma.client.bookingResourceSchedule.create({ data: { resourceId, ...dto } });
+    return this.findOne(resourceId);
+  }
+
+  async updateScheduleEntry(resourceId: string, entryId: string, dto: UpdateScheduleEntryDto) {
+    const entry = await this.prisma.client.bookingResourceSchedule.findFirst({
+      where: { id: entryId, resourceId },
+    });
+    if (!entry) throw new NotFoundError('BookingResourceSchedule');
+
+    const startMinute = dto.startMinute ?? entry.startMinute;
+    const endMinute = dto.endMinute ?? entry.endMinute;
+    if (endMinute <= startMinute) {
+      throw new ValidationError('endMinute must be after startMinute');
+    }
+
+    await this.prisma.client.bookingResourceSchedule.update({ where: { id: entryId }, data: dto });
     return this.findOne(resourceId);
   }
 

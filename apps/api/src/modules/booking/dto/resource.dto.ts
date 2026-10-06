@@ -60,3 +60,23 @@ export class CreateScheduleEntryDto {
   @Max(1440)
   declare endMinute: number;
 }
+
+export class UpdateScheduleEntryDto {
+  @IsInt()
+  @Min(0)
+  @Max(6)
+  @IsOptional()
+  declare dayOfWeek?: number;
+
+  @IsInt()
+  @Min(0)
+  @Max(1439)
+  @IsOptional()
+  declare startMinute?: number;
+
+  @IsInt()
+  @Min(1)
+  @Max(1440)
+  @IsOptional()
+  declare endMinute?: number;
+}

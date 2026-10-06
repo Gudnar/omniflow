@@ -2,7 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, UseGuards, HttpCode 
 import { JwtAuthGuard } from '../auth/guards';
 import { RequirePermission } from '../auth/decorators';
 import { BookingResourcesService } from './booking-resources.service';
-import { CreateResourceDto, UpdateResourceDto, CreateScheduleEntryDto } from './dto/resource.dto';
+import { CreateResourceDto, UpdateResourceDto, CreateScheduleEntryDto, UpdateScheduleEntryDto } from './dto/resource.dto';
 
 @Controller('booking/resources')
 export class BookingResourcesController {
@@ -66,6 +66,13 @@ export class BookingResourcesController {
   @RequirePermission('booking.manage')
   addScheduleEntry(@Param('id') id: string, @Body() dto: CreateScheduleEntryDto) {
     return this.resourcesService.addScheduleEntry(id, dto);
+  }
+
+  @Patch(':id/schedule/:entryId')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('booking.manage')
+  updateScheduleEntry(@Param('id') id: string, @Param('entryId') entryId: string, @Body() dto: UpdateScheduleEntryDto) {
+    return this.resourcesService.updateScheduleEntry(id, entryId, dto);
   }
 
   @Delete(':id/schedule/:entryId')

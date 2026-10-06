@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Pencil, Check, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api-client';
@@ -200,9 +200,13 @@ function ResourceDetailPanel({
   const { tokens } = useAuth();
   const toast = useToast();
   const [scheduleForm, setScheduleForm] = useState({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
+  const [editEntryForm, setEditEntryForm] = useState({ dayOfWeek: 1, startTime: '09:00', endTime: '18:00' });
   const [userSchedule, setUserSchedule] = useState<UserSchedule | null>(null);
   const [timeOff, setTimeOff] = useState<UserTimeOff[] | null>(null);
   const [userScheduleForm, setUserScheduleForm] = useState({ dayOfWeek: 1, startTime: '09:00', endTime: '13:00' });
+  const [editingIntervalId, setEditingIntervalId] = useState<string | null>(null);
+  const [editIntervalForm, setEditIntervalForm] = useState({ dayOfWeek: 1, startTime: '09:00', endTime: '13:00' });
   const [timeOffForm, setTimeOffForm] = useState({ startAt: '', endAt: '', reason: '' });
 
   useEffect(() => {
@@ -253,6 +257,26 @@ function ResourceDetailPanel({
     }
   };
 
+  const startEditEntry = (entry: { id: string; dayOfWeek: number; startMinute: number; endMinute: number }) => {
+    setEditingEntryId(entry.id);
+    setEditEntryForm({ dayOfWeek: entry.dayOfWeek, startTime: minutesToTime(entry.startMinute), endTime: minutesToTime(entry.endMinute) });
+  };
+
+  const saveEditEntry = async (entryId: string) => {
+    try {
+      await apiPatch(`/booking/resources/${resource.id}/schedule/${entryId}`, tokens?.accessToken, {
+        dayOfWeek: editEntryForm.dayOfWeek,
+        startMinute: timeToMinutes(editEntryForm.startTime),
+        endMinute: timeToMinutes(editEntryForm.endTime),
+      });
+      setEditingEntryId(null);
+      onChanged();
+      toast.success('Horario actualizado correctamente');
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo actualizar el horario');
+    }
+  };
+
   const addUserScheduleInterval = async () => {
     if (!resource.userId || !userSchedule) return;
     const newIntervals = [
@@ -281,6 +305,32 @@ function ResourceDetailPanel({
       const updated = await apiPatch<UserSchedule>(`/users/${resource.userId}/schedule`, tokens?.accessToken, { intervals: newIntervals });
       setUserSchedule(updated);
       toast.success('Horario eliminado correctamente');
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo actualizar el horario');
+    }
+  };
+
+  const startEditInterval = (entry: { id: string; dayOfWeek: number; startMinute: number; endMinute: number }) => {
+    setEditingIntervalId(entry.id);
+    setEditIntervalForm({ dayOfWeek: entry.dayOfWeek, startTime: minutesToTime(entry.startMinute), endTime: minutesToTime(entry.endMinute) });
+  };
+
+  // No per-interval PATCH exists for UserScheduleInterval — the backend only
+  // accepts replacing the whole array (see updateIntervals in
+  // user-schedules.service.ts), so "editing" one means resending the full
+  // list with that entry's values swapped in, same as add/remove above.
+  const saveEditInterval = async (intervalId: string) => {
+    if (!resource.userId || !userSchedule) return;
+    const newIntervals = userSchedule.intervals.map((i) =>
+      i.id === intervalId
+        ? { dayOfWeek: editIntervalForm.dayOfWeek, startMinute: timeToMinutes(editIntervalForm.startTime), endMinute: timeToMinutes(editIntervalForm.endTime) }
+        : { dayOfWeek: i.dayOfWeek, startMinute: i.startMinute, endMinute: i.endMinute },
+    );
+    try {
+      const updated = await apiPatch<UserSchedule>(`/users/${resource.userId}/schedule`, tokens?.accessToken, { intervals: newIntervals });
+      setUserSchedule(updated);
+      setEditingIntervalId(null);
+      toast.success('Horario actualizado correctamente');
     } catch (err: any) {
       toast.error(err.message ?? 'No se pudo actualizar el horario');
     }
@@ -346,14 +396,41 @@ function ResourceDetailPanel({
       <div>
         <h4 className="text-sm font-bold text-gray-900 mb-3">Horario del recurso</h4>
         <div className="space-y-1.5 mb-3">
-          {resource.schedule.map((entry) => (
-            <div key={entry.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
-              <span>{DAY_LABELS[entry.dayOfWeek]} · {minutesToTime(entry.startMinute)} - {minutesToTime(entry.endMinute)}</span>
-              <button onClick={() => removeScheduleEntry(entry.id)} className="text-red-500 hover:text-red-600">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))}
+          {resource.schedule.map((entry) =>
+            editingEntryId === entry.id ? (
+              <div key={entry.id} className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
+                <select
+                  value={editEntryForm.dayOfWeek}
+                  onChange={(e) => setEditEntryForm({ ...editEntryForm, dayOfWeek: Number(e.target.value) })}
+                  className="px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white"
+                >
+                  {DAY_LABELS.map((d, i) => (
+                    <option key={i} value={i}>{d}</option>
+                  ))}
+                </select>
+                <input type="time" value={editEntryForm.startTime} onChange={(e) => setEditEntryForm({ ...editEntryForm, startTime: e.target.value })} className="px-2 py-1 border border-gray-200 rounded-lg text-xs" />
+                <input type="time" value={editEntryForm.endTime} onChange={(e) => setEditEntryForm({ ...editEntryForm, endTime: e.target.value })} className="px-2 py-1 border border-gray-200 rounded-lg text-xs" />
+                <button onClick={() => saveEditEntry(entry.id)} className="text-emerald-600 hover:text-emerald-700 shrink-0">
+                  <Check className="w-4 h-4" />
+                </button>
+                <button onClick={() => setEditingEntryId(null)} className="text-gray-400 hover:text-gray-600 shrink-0">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div key={entry.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+                <span>{DAY_LABELS[entry.dayOfWeek]} · {minutesToTime(entry.startMinute)} - {minutesToTime(entry.endMinute)}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button onClick={() => startEditEntry(entry)} className="text-gray-400 hover:text-blue-600">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                  <button onClick={() => removeScheduleEntry(entry.id)} className="text-red-500 hover:text-red-600">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            ),
+          )}
           {resource.schedule.length === 0 && <p className="text-xs text-gray-400">Sin horario configurado.</p>}
         </div>
         <div className="flex items-center gap-2">
@@ -378,14 +455,41 @@ function ResourceDetailPanel({
               La disponibilidad real es la intersección entre el horario del recurso y este horario personal.
             </p>
             <div className="space-y-1.5 mb-3">
-              {(userSchedule?.intervals ?? []).map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
-                  <span>{DAY_LABELS[entry.dayOfWeek]} · {minutesToTime(entry.startMinute)} - {minutesToTime(entry.endMinute)}</span>
-                  <button onClick={() => removeUserScheduleInterval(entry.id)} className="text-red-500 hover:text-red-600">
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
+              {(userSchedule?.intervals ?? []).map((entry) =>
+                editingIntervalId === entry.id ? (
+                  <div key={entry.id} className="flex items-center gap-2 bg-blue-50 rounded-lg px-3 py-2">
+                    <select
+                      value={editIntervalForm.dayOfWeek}
+                      onChange={(e) => setEditIntervalForm({ ...editIntervalForm, dayOfWeek: Number(e.target.value) })}
+                      className="px-2 py-1 border border-gray-200 rounded-lg text-xs bg-white"
+                    >
+                      {DAY_LABELS.map((d, i) => (
+                        <option key={i} value={i}>{d}</option>
+                      ))}
+                    </select>
+                    <input type="time" value={editIntervalForm.startTime} onChange={(e) => setEditIntervalForm({ ...editIntervalForm, startTime: e.target.value })} className="px-2 py-1 border border-gray-200 rounded-lg text-xs" />
+                    <input type="time" value={editIntervalForm.endTime} onChange={(e) => setEditIntervalForm({ ...editIntervalForm, endTime: e.target.value })} className="px-2 py-1 border border-gray-200 rounded-lg text-xs" />
+                    <button onClick={() => saveEditInterval(entry.id)} className="text-emerald-600 hover:text-emerald-700 shrink-0">
+                      <Check className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => setEditingIntervalId(null)} className="text-gray-400 hover:text-gray-600 shrink-0">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div key={entry.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-2">
+                    <span>{DAY_LABELS[entry.dayOfWeek]} · {minutesToTime(entry.startMinute)} - {minutesToTime(entry.endMinute)}</span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button onClick={() => startEditInterval(entry)} className="text-gray-400 hover:text-blue-600">
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                      <button onClick={() => removeUserScheduleInterval(entry.id)} className="text-red-500 hover:text-red-600">
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ),
+              )}
               {userSchedule && userSchedule.intervals.length === 0 && <p className="text-xs text-gray-400">Sin horario personal configurado.</p>}
             </div>
             <div className="flex items-center gap-2">
