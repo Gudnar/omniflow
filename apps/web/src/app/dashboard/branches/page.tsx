@@ -354,12 +354,20 @@ export default function BranchesPage() {
                   className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option>UTC</option>
+                  <option>America/La_Paz</option>
+                  <option>America/Bogota</option>
+                  <option>America/Lima</option>
+                  <option>America/Santiago</option>
+                  <option>America/Asuncion</option>
+                  <option>America/Montevideo</option>
+                  <option>America/Argentina/Buenos_Aires</option>
+                  <option>America/Sao_Paulo</option>
+                  <option>America/Mexico_City</option>
                   <option>America/New_York</option>
                   <option>America/Los_Angeles</option>
                   <option>America/Denver</option>
-                  <option>Europe/London</option>
                   <option>Europe/Madrid</option>
-                  <option>America/Mexico_City</option>
+                  <option>Europe/London</option>
                 </select>
               </div>
             </div>
