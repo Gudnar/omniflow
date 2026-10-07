@@ -6,6 +6,7 @@ import { apiGet, apiPost } from '@/lib/api-client';
 import { connectAsVisitor } from '@/lib/socket-client';
 import type { WebchatMessage } from '@/lib/types';
 import type { Socket } from 'socket.io-client';
+import { ImageLightbox } from '@/components/ui/image-lightbox';
 
 interface WebchatSession {
   conversationId: string;
@@ -43,6 +44,7 @@ export function WebchatWidget({
   // Quick-reply buttons and forms are one-shot — once the visitor answers
   // one, that same bubble shows as answered instead of staying clickable.
   const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set());
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; alt: string } | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
   const loadMessages = (s: WebchatSession) => {
@@ -123,6 +125,7 @@ export function WebchatWidget({
   }
 
   return (
+    <>
     <div className="fixed bottom-5 right-5 w-80 max-w-[calc(100vw-2.5rem)] h-[28rem] bg-white rounded-2xl shadow-2xl flex flex-col z-50 border border-gray-200 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 text-white shrink-0" style={{ backgroundColor: primaryColor }}>
         <p className="text-sm font-semibold">{title}</p>
@@ -204,7 +207,12 @@ export function WebchatWidget({
               >
                 {imageAttachment && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={imageAttachment.url} alt={m.content || imageAttachment.fileName} className="max-w-full rounded-lg mb-1" />
+                  <img
+                    src={imageAttachment.url}
+                    alt={m.content || imageAttachment.fileName}
+                    className="max-w-full rounded-lg mb-1 cursor-pointer"
+                    onClick={() => setLightboxImage({ url: imageAttachment.url, alt: m.content || imageAttachment.fileName })}
+                  />
                 )}
                 {m.content}
               </div>
@@ -232,6 +240,10 @@ export function WebchatWidget({
         </button>
       </div>
     </div>
+    {lightboxImage && (
+      <ImageLightbox src={lightboxImage.url} alt={lightboxImage.alt} onClose={() => setLightboxImage(null)} />
+    )}
+    </>
   );
 }
 

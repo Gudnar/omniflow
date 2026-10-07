@@ -7,6 +7,7 @@ import { apiGet, apiPost } from '@/lib/api-client';
 import { connectAsVisitor } from '@/lib/socket-client';
 import type { ConversationWindowData } from '@/lib/types';
 import type { Socket } from 'socket.io-client';
+import { ImageLightbox } from '@/components/ui/image-lightbox';
 
 // "Continue this conversation from the web" — reached via a link an operator
 // generates from an EXISTING conversation (see the "Enviar enlace web"
@@ -46,6 +47,7 @@ export default function ConversationWindowPage() {
   // Quick-reply buttons and forms are one-shot — once answered, that bubble
   // stops being interactive instead of staying clickable/editable.
   const [answeredIds, setAnsweredIds] = useState<Set<string>>(new Set());
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; alt: string } | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -118,6 +120,7 @@ export default function ConversationWindowPage() {
     // the visual viewport the same way WhatsApp's own web/app UI does, so
     // the input stays pinned right above the keyboard instead of hidden
     // behind it.
+    <>
     <div className="h-dvh flex flex-col overflow-hidden" style={{ backgroundColor: '#efe8df' }}>
       <div className="shrink-0 flex items-center gap-3 px-4 py-2.5 text-white shadow-sm z-10" style={{ backgroundColor: GREEN_DARK }}>
         <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center overflow-hidden shrink-0">
@@ -253,7 +256,12 @@ export default function ConversationWindowPage() {
                 >
                   {imageAttachment && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={imageAttachment.url} alt={m.content || imageAttachment.fileName} className="max-w-full rounded-lg mb-1" />
+                    <img
+                      src={imageAttachment.url}
+                      alt={m.content || imageAttachment.fileName}
+                      className="max-w-full rounded-lg mb-1 cursor-pointer"
+                      onClick={() => setLightboxImage({ url: imageAttachment.url, alt: m.content || imageAttachment.fileName })}
+                    />
                   )}
                   <p className="text-gray-800 whitespace-pre-wrap pr-1" style={{ wordBreak: 'break-word' }}>
                     {m.content}
@@ -293,6 +301,10 @@ export default function ConversationWindowPage() {
         </button>
       </div>
     </div>
+    {lightboxImage && (
+      <ImageLightbox src={lightboxImage.url} alt={lightboxImage.alt} onClose={() => setLightboxImage(null)} />
+    )}
+    </>
   );
 }
 
