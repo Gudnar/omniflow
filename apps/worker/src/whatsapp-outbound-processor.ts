@@ -51,7 +51,11 @@ function buildOutboundBody(message: any, to: string): Record<string, unknown> {
       interactive: {
         type: 'cta_url',
         body: { text: bodyText },
-        action: { name: 'cta_url', parameters: { display_text: label, url } },
+        // display_text has the exact same 20-char cap as a reply button's
+        // title — unlike that path, this one had no truncation at all,
+        // so a label even slightly over 20 chars made Graph reject the
+        // WHOLE send (error 131009) with nothing ever reaching the phone.
+        action: { name: 'cta_url', parameters: { display_text: label.slice(0, WHATSAPP_BUTTON_TITLE_MAX), url } },
       },
     };
   }

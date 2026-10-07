@@ -478,7 +478,7 @@ export class AiReplyService {
       direction: 'OUTBOUND',
       type: 'CTA',
       content: `${introMessage}\n\n${url}`,
-      ctaPayload: { action: 'STORE', url, label: 'Continuar por chat web' },
+      ctaPayload: { action: 'STORE', url, label: 'Continuar por web' },
     } as any);
     return true;
   }

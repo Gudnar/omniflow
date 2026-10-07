@@ -552,7 +552,7 @@ describe('AiReplyService', () => {
         direction: 'OUTBOUND',
         type: 'CTA',
         content: 'Dale, seguimos por acá\n\nhttp://localhost:3000/chat/webtoken1',
-        ctaPayload: { action: 'STORE', url: 'http://localhost:3000/chat/webtoken1', label: 'Continuar por chat web' },
+        ctaPayload: { action: 'STORE', url: 'http://localhost:3000/chat/webtoken1', label: 'Continuar por web' },
       });
     });
 

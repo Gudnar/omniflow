@@ -401,7 +401,7 @@ export class MetaWebhookService {
         direction: 'OUTBOUND',
         type: 'CTA',
         content: `O seguimos la conversación desde la web:\n\n${webUrl}`,
-        ctaPayload: { action: 'STORE', url: webUrl, label: 'Continuar por chat web' },
+        ctaPayload: { action: 'STORE', url: webUrl, label: 'Continuar por web' },
       } as any);
     } catch (error) {
       logger.error('Meta webhook: failed generating web link for returning contact', error as Error, { conversationId });

@@ -350,7 +350,7 @@ describe('MetaWebhookService', () => {
         expect(messagesService.create).toHaveBeenCalledWith(
           'conv1',
           undefined,
-          expect.objectContaining({ type: 'CTA', ctaPayload: expect.objectContaining({ label: 'Continuar por chat web' }) }),
+          expect.objectContaining({ type: 'CTA', ctaPayload: expect.objectContaining({ label: 'Continuar por web' }) }),
         );
         expect(conversationsService.generateWebLink).toHaveBeenCalledWith('conv1');
         expect(prisma.client.conversation.update).toHaveBeenCalledWith({ where: { id: 'conv1' }, data: { aiPaused: true } });
@@ -366,7 +366,7 @@ describe('MetaWebhookService', () => {
         expect(messagesService.create).toHaveBeenCalledWith(
           'conv1',
           undefined,
-          expect.objectContaining({ type: 'CTA', ctaPayload: expect.objectContaining({ label: 'Continuar por chat web' }) }),
+          expect.objectContaining({ type: 'CTA', ctaPayload: expect.objectContaining({ label: 'Continuar por web' }) }),
         );
         expect(prisma.client.conversation.update).toHaveBeenCalledWith({ where: { id: 'conv1' }, data: { aiPaused: true } });
       });
