@@ -20,8 +20,11 @@ const SEND_STOREFRONT_LINK_TOOL = 'send_storefront_link';
 const SEND_QUICK_REPLIES_TOOL = 'send_quick_replies';
 const SEND_FORM_TOOL = 'send_form';
 // Sending the interactive element to the customer IS the reply for these —
-// never fed back to the model for another round, unlike the generic
-// ecommerce/booking data tools in AiToolsService.
+// ends the turn immediately on success, unlike the generic ecommerce/booking
+// data tools in AiToolsService. A REJECTED call (bad/unauthorized arguments)
+// still gets one retry with a tool-error result — see generateReply — so a
+// model that eagerly calls one of these with no accompanying text doesn't
+// leave the conversation with nothing sent at all.
 const TERMINAL_TOOL_NAMES = new Set([SEND_STOREFRONT_LINK_TOOL, SEND_QUICK_REPLIES_TOOL, SEND_FORM_TOOL]);
 const MAX_CTA_MESSAGE_LENGTH = 300;
 const FORM_FIELD_TYPES = new Set(['text', 'email', 'tel', 'number']);
@@ -248,10 +251,34 @@ export class AiReplyService {
           completionTokens,
         });
         if (sent) return;
-        // Rejected (unauthorized/invalid args) — same as before, fall through
-        // to the generic "send completion.content as TEXT if non-empty"
-        // handling below rather than looping back to the model again.
-        break;
+
+        // Authorized tool, but rejected arguments (e.g. asked for a STORE
+        // link on a BOOKING-only store, or left out the required message) —
+        // give the model one more turn with a plain tool-error result
+        // instead of silently dropping everything. Without this, a model
+        // that calls the tool with bad args and no accompanying text (common
+        // for tool-calling models) leaves nothing at all to send — this was
+        // observed in production as a conversation going completely silent
+        // because the agent's own goal pushed it to call this tool on every
+        // single inbound message, including plain greetings.
+        messages = [...messages, { role: 'assistant', content: completion.content, toolCalls: completion.toolCalls }];
+        messages.push({
+          role: 'tool',
+          toolCallId: terminalCall.id,
+          toolName: terminalCall.name,
+          content: JSON.stringify({ ok: false, error: 'Invalid or unavailable arguments for this action — reply with a normal text message instead.' }),
+        });
+        completion = await adapter.complete({
+          apiKey,
+          model: agent.model.name,
+          messages,
+          temperature: agent.temperature,
+          maxTokens: agent.maxTokens,
+          ...(offeredTools.length && { tools: offeredTools }),
+        });
+        promptTokens += completion.promptTokens;
+        completionTokens += completion.completionTokens;
+        continue;
       }
 
       messages = [...messages, { role: 'assistant', content: completion.content, toolCalls: completion.toolCalls }];

@@ -381,6 +381,55 @@ describe('AiReplyService', () => {
       expect(messagesService.create).not.toHaveBeenCalled();
       expect(prisma.client.aiUsage.create).not.toHaveBeenCalled();
     });
+
+    it('retries with a tool-error result after a rejected call, and sends the model\'s follow-up text instead of staying silent', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent()]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'Hola' });
+      prisma.client.ecommerceStore.findUnique.mockResolvedValue({ status: 'PUBLISHED', operationMode: 'DIRECT_SALE' });
+      openAiAdapter.complete
+        .mockResolvedValueOnce({
+          content: '',
+          promptTokens: 30,
+          completionTokens: 5,
+          // Store is DIRECT_SALE only — asking for BOOKING is rejected.
+          toolCalls: [{ name: 'send_storefront_link', arguments: JSON.stringify({ action: 'BOOKING', message: 'Elegí un horario' }) }],
+        })
+        .mockResolvedValueOnce({ content: '¡Hola! ¿En qué te puedo ayudar?', promptTokens: 10, completionTokens: 8 });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(openAiAdapter.complete).toHaveBeenCalledTimes(2);
+      const [, [secondCallArgs]] = openAiAdapter.complete.mock.calls;
+      const toolResultMessage = secondCallArgs.messages.find((m: any) => m.role === 'tool');
+      expect(toolResultMessage).toBeDefined();
+      expect(JSON.parse(toolResultMessage.content).ok).toBe(false);
+      expect(messagesService.create).toHaveBeenCalledWith('conv1', 'agent-1', {
+        direction: 'OUTBOUND',
+        type: 'TEXT',
+        content: '¡Hola! ¿En qué te puedo ayudar?',
+      });
+    });
+
+    it('stops retrying after MAX_TOOL_ITERATIONS when the model keeps failing the same tool call', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent()]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'Hola' });
+      prisma.client.ecommerceStore.findUnique.mockResolvedValue({ status: 'PUBLISHED', operationMode: 'DIRECT_SALE' });
+      openAiAdapter.complete.mockResolvedValue({
+        content: '',
+        promptTokens: 5,
+        completionTokens: 1,
+        toolCalls: [{ name: 'send_storefront_link', arguments: JSON.stringify({ action: 'BOOKING', message: 'Elegí un horario' }) }],
+      });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      // One initial call, then up to MAX_TOOL_ITERATIONS (6) retries while
+      // the model keeps failing the same tool call.
+      expect(openAiAdapter.complete).toHaveBeenCalledTimes(7);
+      expect(messagesService.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('send_quick_replies / send_form tools', () => {
