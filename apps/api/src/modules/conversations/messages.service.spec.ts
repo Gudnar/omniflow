@@ -306,6 +306,39 @@ describe('MessagesService', () => {
       });
     });
 
+    // The WhatsApp returning-contact brake (MetaWebhookService) pauses the
+    // AI on a conversation once it's sent its one-shot CTA message — but a
+    // customer who actually follows the "Continuar por web" link and starts
+    // typing there is deliberately engaging, so that pause must lift the
+    // moment they do, not stay stuck forever.
+    describe('aiPaused reset on web-window engagement', () => {
+      it('clears aiPaused on an INBOUND message sent via the web window', async () => {
+        conversationsService.findOne.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1', channel: 'WHATSAPP' });
+
+        await service.create('conv1', '', { direction: 'INBOUND', content: 'Hola', viaWebWindow: true } as any);
+
+        expect(tx.conversation.update).toHaveBeenCalledWith(
+          expect.objectContaining({ data: expect.objectContaining({ aiPaused: false }) }),
+        );
+      });
+
+      it('does not touch aiPaused on a real (webhook) INBOUND message', async () => {
+        conversationsService.findOne.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1', channel: 'WHATSAPP' });
+
+        await service.create('conv1', '', { direction: 'INBOUND', content: 'Hola real' } as any);
+
+        expect(tx.conversation.update.mock.calls[0][0].data).not.toHaveProperty('aiPaused');
+      });
+
+      it('does not touch aiPaused on an OUTBOUND message', async () => {
+        conversationsService.findOne.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1', channel: 'WHATSAPP' });
+
+        await service.create('conv1', 'agent-1', { direction: 'OUTBOUND', content: 'Respuesta' } as any);
+
+        expect(tx.conversation.update.mock.calls[0][0].data).not.toHaveProperty('aiPaused');
+      });
+    });
+
     it('does not enqueue for the reserved/unused FACEBOOK channel', async () => {
       conversationsService.findOne.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1', channel: 'FACEBOOK' });
 

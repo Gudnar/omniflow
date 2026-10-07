@@ -75,6 +75,13 @@ export class MessagesService {
           // established. A real inbound (dto.viaWebWindow unset) always
           // resets this to false, restoring normal external delivery.
           ...(dto.direction === 'INBOUND' && { lastInboundViaWebWindow: !!dto.viaWebWindow }),
+          // A customer who actually followed the "Continuar por web" link
+          // and started typing here is deliberately engaging — the WhatsApp
+          // returning-contact brake (aiPaused, see MetaWebhookService) was
+          // only ever meant to stop unsolicited AI chatter on WhatsApp
+          // itself, never to also mute the dedicated hand-off window once
+          // they chose to use it.
+          ...(dto.direction === 'INBOUND' && dto.viaWebWindow && { aiPaused: false }),
         },
       });
 
