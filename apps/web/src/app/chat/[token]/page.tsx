@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { Send, Loader2, Link2, Check, Lock } from 'lucide-react';
-import { apiGet, apiPost } from '@/lib/api-client';
+import { apiGet, apiPost, ApiError } from '@/lib/api-client';
 import { connectAsVisitor } from '@/lib/socket-client';
 import type { ConversationWindowData } from '@/lib/types';
 import type { Socket } from 'socket.io-client';
@@ -54,7 +54,18 @@ export default function ConversationWindowPage() {
   const loadWindow = () =>
     apiGet<ConversationWindowData>(`/conversation-window/${token}`)
       .then(setData)
-      .catch(() => setNotFound(true));
+      .catch((err) => {
+        // Only a real 404 (the token genuinely doesn't resolve to any
+        // conversation) means "expired" — a transient network blip or
+        // server hiccup (common right after an Android back-navigation
+        // resumes the page from cache) must never show that dead-end
+        // screen over what's otherwise a perfectly valid link.
+        if (err instanceof ApiError && err.status === 404) {
+          setNotFound(true);
+        } else {
+          console.error('Error loading conversation window:', err);
+        }
+      });
 
   useEffect(() => {
     if (!token) return;

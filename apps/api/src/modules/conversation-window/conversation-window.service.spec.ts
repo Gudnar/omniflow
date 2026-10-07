@@ -157,7 +157,7 @@ describe('ConversationWindowService', () => {
 
         expect(prisma.client.conversation.updateMany).toHaveBeenCalledWith({
           where: { id: 'conv1', webWindowGreetedAt: null },
-          data: { webWindowGreetedAt: expect.any(Date), aiPaused: false },
+          data: { webWindowGreetedAt: expect.any(Date), aiPaused: false, lastInboundViaWebWindow: true },
         });
         expect(queueService.enqueueAiReply).toHaveBeenCalledWith('t1', 'conv1', null);
       });

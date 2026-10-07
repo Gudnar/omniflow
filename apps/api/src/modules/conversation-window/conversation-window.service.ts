@@ -45,9 +45,14 @@ export class ConversationWindowService {
     // socket re-calls getWindow() on every message.created, including the
     // greeting's own reply, so only the very first caller to see
     // webWindowGreetedAt: null actually wins the race and enqueues it.
+    // lastInboundViaWebWindow is also set true here, not just by an actual
+    // customer-typed message — otherwise MessagesService.create() has no way
+    // to know the greeting (and any reply before the customer's first typed
+    // message) should stay web-only, and re-dispatches it to real WhatsApp
+    // too, since nothing INBOUND from the window has happened yet to flip it.
     const { count } = await this.prisma.client.conversation.updateMany({
       where: { id: conversation.id, webWindowGreetedAt: null },
-      data: { webWindowGreetedAt: new Date(), aiPaused: false },
+      data: { webWindowGreetedAt: new Date(), aiPaused: false, lastInboundViaWebWindow: true },
     });
     if (count > 0) {
       await this.queueService.enqueueAiReply(conversation.tenantId, conversation.id, null);
