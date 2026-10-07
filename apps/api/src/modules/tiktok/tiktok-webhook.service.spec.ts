@@ -96,6 +96,7 @@ describe('TikTokWebhookService', () => {
         externalId: 'open_abc123',
         firstMessageContent: 'Hola desde TikTok',
         firstMessageExternalId: 'ttmsg.TESTID001',
+        isNewContact: true,
       }),
     );
     expect(messagesService.create).not.toHaveBeenCalled();
@@ -126,7 +127,7 @@ describe('TikTokWebhookService', () => {
     await service.handlePayload(buildPayload());
 
     expect(conversationsService.create).toHaveBeenCalledWith(
-      expect.objectContaining({ contactId: 'ct1', channel: 'TIKTOK' }),
+      expect.objectContaining({ contactId: 'ct1', channel: 'TIKTOK', isNewContact: false }),
     );
     expect(messagesService.create).not.toHaveBeenCalled();
   });

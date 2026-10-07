@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Star, Info, MoreVertical, Send, Mic, Link2, Copy, ListChecks, X, Plus } from 'lucide-react';
+import { Star, Info, MoreVertical, Send, Mic, Link2, Copy, ListChecks, X, Plus, Megaphone } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost } from '@/lib/api-client';
@@ -176,6 +176,20 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
               <p className="text-sm font-semibold text-gray-900">{conversation.contact.name}</p>
               <ChannelIcon channel={channel} className="w-3.5 h-3.5" />
               <span className="text-xs text-gray-400">{CHANNEL_LABELS[channel]}</span>
+              {conversation.isNewContact && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                  Contacto nuevo
+                </span>
+              )}
+              {conversation.adReferral && (
+                <span
+                  title={[conversation.adReferral.headline, conversation.adReferral.sourceUrl]
+                    .filter(Boolean)
+                    .join(' — ') || 'Llegó desde un anuncio'}
+                >
+                  <Megaphone className="w-3.5 h-3.5 text-amber-500" />
+                </span>
+              )}
             </div>
           </div>
         </div>

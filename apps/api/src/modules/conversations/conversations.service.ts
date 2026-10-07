@@ -82,6 +82,8 @@ export class ConversationsService {
           branchId: dto.branchId,
           assignedToId: dto.assignedToId,
           lastMessageAt: dto.firstMessageContent ? new Date() : undefined,
+          isNewContact: dto.isNewContact ?? false,
+          adReferral: dto.adReferral ?? undefined,
         },
       });
 

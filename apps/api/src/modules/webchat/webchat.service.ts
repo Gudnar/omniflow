@@ -56,6 +56,7 @@ export class WebchatService {
       contactId: contact.id,
       channel: 'WEBCHAT',
       externalId: randomBytes(16).toString('hex'),
+      isNewContact: true,
     } as any);
 
     const webchatToken = randomBytes(32).toString('hex');

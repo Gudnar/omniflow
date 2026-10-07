@@ -207,6 +207,16 @@ export interface Conversation {
   contact: { id: string; name: string };
   branch: { id: string; name: string } | null;
   contactChannel?: { id: string; externalId: string } | null;
+  isNewContact: boolean;
+  adReferral: {
+    sourceUrl?: string;
+    sourceType?: string;
+    sourceId?: string;
+    headline?: string;
+    body?: string;
+    mediaType?: string;
+    ctwaClid?: string;
+  } | null;
 }
 
 export type MessageDirection = 'INBOUND' | 'OUTBOUND';

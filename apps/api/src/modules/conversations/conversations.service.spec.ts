@@ -92,6 +92,27 @@ describe('ConversationsService', () => {
       expect(queueService.enqueueAiReply).not.toHaveBeenCalled();
     });
 
+    it('defaults isNewContact to false and adReferral to undefined when not provided', async () => {
+      tx.conversation.create.mockResolvedValue({ id: 'conv1' });
+      tx.conversation.findUnique.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1' });
+
+      await service.create({ contactId: 'ct1', channel: 'WHATSAPP' } as any);
+
+      expect(tx.conversation.create.mock.calls[0][0].data.isNewContact).toBe(false);
+      expect(tx.conversation.create.mock.calls[0][0].data.adReferral).toBeUndefined();
+    });
+
+    it('persists isNewContact and adReferral when the caller provides them', async () => {
+      tx.conversation.create.mockResolvedValue({ id: 'conv1' });
+      tx.conversation.findUnique.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1' });
+      const adReferral = { sourceUrl: 'https://fb.me/ad1', headline: 'Promo' };
+
+      await service.create({ contactId: 'ct1', channel: 'WHATSAPP', isNewContact: true, adReferral } as any);
+
+      expect(tx.conversation.create.mock.calls[0][0].data.isNewContact).toBe(true);
+      expect(tx.conversation.create.mock.calls[0][0].data.adReferral).toEqual(adReferral);
+    });
+
     it('upserts the contact channel and creates a first inbound message when provided', async () => {
       tx.contactChannel.upsert.mockResolvedValue({ id: 'cc1' });
       tx.conversation.create.mockResolvedValue({ id: 'conv1' });

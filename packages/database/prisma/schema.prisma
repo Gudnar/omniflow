@@ -619,6 +619,18 @@ model Conversation {
   // normal external delivery.
   lastInboundViaWebWindow Boolean @default(false)
 
+  // True only if this conversation's Contact was created AT THIS SAME
+  // moment (processInboundMessage()'s "!contactChannel" branch) — never
+  // recalculated afterwards, so it keeps describing how the relationship
+  // started even if the contact keeps writing for years.
+  isNewContact Boolean @default(false)
+
+  // Present only when the FIRST message that opened this conversation
+  // carried a Meta `referral` (a Click-to-WhatsApp ad tap) — sourceUrl,
+  // sourceType, headline, body, mediaType, ctwaClid. null for everything
+  // else (organic).
+  adReferral Json?
+
   lastMessageAt DateTime?
 
   createdAt DateTime @default(now())

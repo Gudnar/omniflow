@@ -116,6 +116,8 @@ describe('MetaWebhookService', () => {
           externalId: '59178889999',
           firstMessageContent: 'Hola',
           firstMessageExternalId: 'wamid.TESTID001',
+          isNewContact: true,
+          adReferral: undefined,
         }),
       );
       expect(messagesService.create).not.toHaveBeenCalled();
@@ -136,6 +138,64 @@ describe('MetaWebhookService', () => {
       );
       expect(contactsService.create).not.toHaveBeenCalled();
       expect(conversationsService.create).not.toHaveBeenCalled();
+    });
+
+    it('marks isNewContact=false and still forwards adReferral when an existing contact reopens via a new ad', async () => {
+      prisma.raw.metaConnection.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+      prisma.raw.message.findUnique.mockResolvedValue(null);
+      prisma.client.contactChannel.findFirst.mockResolvedValue({ id: 'cc1', contactId: 'ct1' });
+      prisma.client.conversation.findFirst.mockResolvedValue(null);
+
+      await service.handlePayload(
+        buildWhatsAppPayload(
+          buildWhatsAppValue({
+            messages: [
+              {
+                from: '59178889999',
+                id: 'wamid.TESTID002',
+                text: { body: 'Hola' },
+                referral: {
+                  source_url: 'https://fb.me/ad123',
+                  source_type: 'ad',
+                  source_id: 'ad123',
+                  headline: 'Promo de lanzamiento',
+                  body: 'Escríbenos',
+                  media_type: 'image',
+                  ctwa_clid: 'clid-abc',
+                },
+              },
+            ],
+          }),
+        ),
+      );
+
+      expect(conversationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          isNewContact: false,
+          adReferral: {
+            sourceUrl: 'https://fb.me/ad123',
+            sourceType: 'ad',
+            sourceId: 'ad123',
+            headline: 'Promo de lanzamiento',
+            body: 'Escríbenos',
+            mediaType: 'image',
+            ctwaClid: 'clid-abc',
+          },
+        }),
+      );
+    });
+
+    it('does not set adReferral when the message carries none', async () => {
+      prisma.raw.metaConnection.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+      prisma.raw.message.findUnique.mockResolvedValue(null);
+      prisma.client.contactChannel.findFirst.mockResolvedValue({ id: 'cc1', contactId: 'ct1' });
+      prisma.client.conversation.findFirst.mockResolvedValue(null);
+
+      await service.handlePayload(buildWhatsAppPayload(buildWhatsAppValue()));
+
+      expect(conversationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ isNewContact: false, adReferral: undefined }),
+      );
     });
 
     it("uses the tapped button's title as the content for a native interactive reply", async () => {

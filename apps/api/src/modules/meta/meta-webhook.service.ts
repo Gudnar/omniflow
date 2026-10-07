@@ -22,6 +22,18 @@ interface NormalizedInboundMessage {
   // processInboundMessage.
   type?: MessageType;
   audio?: { buffer: Buffer; mimeType: string };
+  // Set only when WhatsApp attaches a `referral` to the message — a tap on
+  // a Click-to-WhatsApp ad. Only present on WhatsApp payloads today
+  // (Instagram/Messenger's messaging events carry no such field).
+  referral?: {
+    sourceUrl?: string;
+    sourceType?: string;
+    sourceId?: string;
+    headline?: string;
+    body?: string;
+    mediaType?: string;
+    ctwaClid?: string;
+  };
 }
 
 @Injectable()
@@ -131,6 +143,17 @@ export class MetaWebhookService {
           content: interactiveReplyTitle ?? msg.text?.body ?? '',
           externalMessageId: msg.id,
           profileName: value.contacts?.[0]?.profile?.name,
+          referral: msg.referral
+            ? {
+                sourceUrl: msg.referral.source_url,
+                sourceType: msg.referral.source_type,
+                sourceId: msg.referral.source_id,
+                headline: msg.referral.headline,
+                body: msg.referral.body,
+                mediaType: msg.referral.media_type,
+                ctwaClid: msg.referral.ctwa_clid,
+              }
+            : undefined,
         });
       } catch (error) {
         logger.error('Meta webhook: failed processing WhatsApp inbound message', error as Error, {
@@ -263,6 +286,8 @@ export class MetaWebhookService {
         externalId: msg.externalContactId,
         firstMessageContent: msg.content,
         firstMessageExternalId: msg.externalMessageId,
+        isNewContact: true,
+        adReferral: msg.referral,
       } as any);
       return;
     }
@@ -279,6 +304,8 @@ export class MetaWebhookService {
         externalId: msg.externalContactId,
         firstMessageContent: msg.content,
         firstMessageExternalId: msg.externalMessageId,
+        isNewContact: false,
+        adReferral: msg.referral,
       } as any);
       return;
     }

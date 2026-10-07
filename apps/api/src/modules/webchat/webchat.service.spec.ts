@@ -55,7 +55,7 @@ describe('WebchatService', () => {
         expect.objectContaining({ name: 'Visitante web', source: 'WEBSITE' }),
       );
       expect(conversationsService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ contactId: 'contact1', channel: 'WEBCHAT' }),
+        expect.objectContaining({ contactId: 'contact1', channel: 'WEBCHAT', isNewContact: true }),
       );
       expect(prisma.client.conversation.update).toHaveBeenCalledWith({
         where: { id: 'conv1' },

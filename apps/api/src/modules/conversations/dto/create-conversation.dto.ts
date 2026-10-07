@@ -1,4 +1,4 @@
-import { IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsBoolean, IsEnum, IsObject, IsOptional, IsString, MinLength } from 'class-validator';
 import { Channel } from '@omniflow/database';
 
 export class CreateConversationDto {
@@ -28,4 +28,12 @@ export class CreateConversationDto {
   @IsString()
   @IsOptional()
   declare firstMessageExternalId?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  declare isNewContact?: boolean;
+
+  @IsObject()
+  @IsOptional()
+  declare adReferral?: Record<string, any>;
 }

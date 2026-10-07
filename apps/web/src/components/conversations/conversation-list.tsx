@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Search, ChevronDown, Download } from 'lucide-react';
+import { Search, ChevronDown, Download, Megaphone } from 'lucide-react';
 import type { Conversation, ConversationStatus } from '@/lib/types';
 import { ChannelBadge } from './channel-icon';
 import type { Channel } from './mock-data';
@@ -136,7 +136,19 @@ export function ConversationList({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold text-gray-900 truncate">{c.contact.name}</p>
+                <p className="text-sm font-semibold text-gray-900 truncate flex items-center gap-1.5">
+                  <span className="truncate">{c.contact.name}</span>
+                  {c.isNewContact && (
+                    <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
+                      Nuevo
+                    </span>
+                  )}
+                  {c.adReferral && (
+                    <span className="shrink-0" title={c.adReferral.headline ?? 'Llegó desde un anuncio'}>
+                      <Megaphone className="w-3 h-3 text-amber-500" />
+                    </span>
+                  )}
+                </p>
                 <span className="text-xs text-gray-400 shrink-0">
                   {new Date(c.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>

@@ -67,6 +67,7 @@ export class TikTokWebhookService {
         externalId: openId,
         firstMessageContent: text ?? '',
         firstMessageExternalId: messageId,
+        isNewContact: true,
       } as any);
       return;
     }
@@ -83,6 +84,7 @@ export class TikTokWebhookService {
         externalId: openId,
         firstMessageContent: text ?? '',
         firstMessageExternalId: messageId,
+        isNewContact: false,
       } as any);
       return;
     }
