@@ -39,7 +39,7 @@ describe('AiReplyService', () => {
     };
     tenantContext = { setContext: jest.fn() };
     messagesService = { create: jest.fn(), sendQuickReplies: jest.fn(), sendForm: jest.fn() };
-    conversationsService = { generateWebLink: jest.fn().mockResolvedValue({ url: 'http://localhost:3000/chat/webtoken1', token: 'webtoken1' }) };
+    conversationsService = { getOrCreateWebLink: jest.fn().mockResolvedValue({ url: 'http://localhost:3000/chat/webtoken1', token: 'webtoken1' }) };
     openAiAdapter = { complete: jest.fn() };
     anthropicAdapter = { complete: jest.fn() };
     geminiAdapter = { complete: jest.fn() };
@@ -547,7 +547,7 @@ describe('AiReplyService', () => {
 
       await service.generateReply('t1', 'conv1', 'msg1');
 
-      expect(conversationsService.generateWebLink).toHaveBeenCalledWith('conv1');
+      expect(conversationsService.getOrCreateWebLink).toHaveBeenCalledWith('conv1');
       expect(messagesService.create).toHaveBeenCalledWith('conv1', 'agent-1', {
         direction: 'OUTBOUND',
         type: 'CTA',
@@ -569,7 +569,7 @@ describe('AiReplyService', () => {
 
       await service.generateReply('t1', 'conv1', 'msg1');
 
-      expect(conversationsService.generateWebLink).not.toHaveBeenCalled();
+      expect(conversationsService.getOrCreateWebLink).not.toHaveBeenCalled();
       expect(messagesService.create).not.toHaveBeenCalled();
     });
   });

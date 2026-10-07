@@ -181,4 +181,19 @@ export class ConversationsService {
     const baseUrl = process.env.STOREFRONT_BASE_URL || 'http://localhost:3000';
     return { url: `${baseUrl}/chat/${webchatToken}`, token: webchatToken };
   }
+
+  // Same link as generateWebLink, but never invalidates one already handed
+  // out — for callers that might offer this link more than once in the same
+  // conversation (the AI agent's send_webchat_link tool) and must not
+  // silently break a session the customer already opened in their browser.
+  // Only the explicit "Enviar enlace web" admin action should ever force a
+  // fresh, previous-link-invalidating token — see generateWebLink above.
+  async getOrCreateWebLink(id: string) {
+    const conversation = await this.findOne(id);
+    if ((conversation as any).webchatToken) {
+      const baseUrl = process.env.STOREFRONT_BASE_URL || 'http://localhost:3000';
+      return { url: `${baseUrl}/chat/${(conversation as any).webchatToken}`, token: (conversation as any).webchatToken };
+    }
+    return this.generateWebLink(id);
+  }
 }

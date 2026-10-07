@@ -295,4 +295,28 @@ describe('ConversationsService', () => {
       expect(result.token).not.toBe('old-token');
     });
   });
+
+  describe('getOrCreateWebLink', () => {
+    it('reuses an existing token instead of minting a new one, so a link already open in a browser never breaks', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1', webchatToken: 'already-issued' });
+
+      const result = await service.getOrCreateWebLink('conv1');
+
+      expect(prisma.client.conversation.update).not.toHaveBeenCalled();
+      expect(result).toEqual({ url: expect.stringContaining('/chat/already-issued'), token: 'already-issued' });
+    });
+
+    it('mints a fresh token when the conversation has none yet', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1', webchatToken: null });
+      prisma.client.conversation.update.mockResolvedValue({ id: 'conv1' });
+
+      const result = await service.getOrCreateWebLink('conv1');
+
+      expect(prisma.client.conversation.update).toHaveBeenCalledWith({
+        where: { id: 'conv1' },
+        data: { webchatToken: expect.any(String) },
+      });
+      expect(result.token).toBeTruthy();
+    });
+  });
 });

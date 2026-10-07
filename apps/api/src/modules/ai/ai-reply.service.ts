@@ -471,7 +471,7 @@ export class AiReplyService {
       return false;
     }
 
-    const { url } = await this.conversationsService.generateWebLink(ctx.conversationId);
+    const { url } = await this.conversationsService.getOrCreateWebLink(ctx.conversationId);
 
     await this.recordUsage(ctx);
     await this.messagesService.create(ctx.conversationId, ctx.agentId, {
