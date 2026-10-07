@@ -4,6 +4,7 @@ import { AiProviderType } from '@omniflow/database';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../tenant-context/tenant-context.service';
 import { MessagesService } from '../conversations/messages.service';
+import { ConversationsService } from '../conversations/conversations.service';
 import { OpenAiAdapter } from './providers/openai.adapter';
 import { AnthropicAdapter } from './providers/anthropic.adapter';
 import { GeminiAdapter } from './providers/gemini.adapter';
@@ -19,13 +20,14 @@ const HISTORY_LIMIT = 20;
 const SEND_STOREFRONT_LINK_TOOL = 'send_storefront_link';
 const SEND_QUICK_REPLIES_TOOL = 'send_quick_replies';
 const SEND_FORM_TOOL = 'send_form';
+const SEND_WEBCHAT_LINK_TOOL = 'send_webchat_link';
 // Sending the interactive element to the customer IS the reply for these —
 // ends the turn immediately on success, unlike the generic ecommerce/booking
 // data tools in AiToolsService. A REJECTED call (bad/unauthorized arguments)
 // still gets one retry with a tool-error result — see generateReply — so a
 // model that eagerly calls one of these with no accompanying text doesn't
 // leave the conversation with nothing sent at all.
-const TERMINAL_TOOL_NAMES = new Set([SEND_STOREFRONT_LINK_TOOL, SEND_QUICK_REPLIES_TOOL, SEND_FORM_TOOL]);
+const TERMINAL_TOOL_NAMES = new Set([SEND_STOREFRONT_LINK_TOOL, SEND_QUICK_REPLIES_TOOL, SEND_FORM_TOOL, SEND_WEBCHAT_LINK_TOOL]);
 const MAX_CTA_MESSAGE_LENGTH = 300;
 const FORM_FIELD_TYPES = new Set(['text', 'email', 'tel', 'number']);
 // Hard ceiling on how many times one reply can round-trip through a tool
@@ -106,6 +108,7 @@ export class AiReplyService {
     private prisma: PrismaService,
     private tenantContext: TenantContextService,
     private messagesService: MessagesService,
+    private conversationsService: ConversationsService,
     openAiAdapter: OpenAiAdapter,
     anthropicAdapter: AnthropicAdapter,
     geminiAdapter: GeminiAdapter,
@@ -331,6 +334,8 @@ export class AiReplyService {
         return this.handleSendQuickReplies(toolCall, ctx);
       case SEND_FORM_TOOL:
         return this.handleSendForm(toolCall, ctx);
+      case SEND_WEBCHAT_LINK_TOOL:
+        return this.handleSendWebchatLink(toolCall, ctx);
       default:
         return false;
     }
@@ -440,6 +445,41 @@ export class AiReplyService {
       fields: fields as { label: string; fieldType: 'text' | 'email' | 'tel' | 'number' }[],
       submitLabel: typeof args.submitLabel === 'string' ? args.submitLabel.trim() : undefined,
     });
+    return true;
+  }
+
+  // Reuses ConversationsService.generateWebLink — the exact same link the
+  // "Enviar enlace web" button in chat-panel.tsx already generates for staff
+  // — so the agent can offer it on its own, on any channel but webchat
+  // itself (redirecting a webchat conversation to webchat is pointless).
+  private async handleSendWebchatLink(toolCall: LlmToolCall, ctx: TerminalToolContext): Promise<boolean> {
+    if (ctx.channel === 'WEBCHAT') {
+      logger.warn('AI tool call rejected: send_webchat_link makes no sense on a webchat conversation', { conversationId: ctx.conversationId, agentId: ctx.agentId });
+      return false;
+    }
+
+    let args: { message?: string } = {};
+    try {
+      args = JSON.parse(toolCall.arguments);
+    } catch {
+      logger.warn('AI tool call had unparsable arguments', { conversationId: ctx.conversationId, agentId: ctx.agentId });
+    }
+
+    const introMessage = typeof args.message === 'string' ? args.message.trim().slice(0, MAX_CTA_MESSAGE_LENGTH) : '';
+    if (!introMessage) {
+      logger.warn('AI tool call rejected: invalid send_webchat_link arguments', { conversationId: ctx.conversationId, agentId: ctx.agentId });
+      return false;
+    }
+
+    const { url } = await this.conversationsService.generateWebLink(ctx.conversationId);
+
+    await this.recordUsage(ctx);
+    await this.messagesService.create(ctx.conversationId, ctx.agentId, {
+      direction: 'OUTBOUND',
+      type: 'CTA',
+      content: `${introMessage}\n\n${url}`,
+      ctaPayload: { action: 'STORE', url, label: 'Continuar por chat web' },
+    } as any);
     return true;
   }
 }

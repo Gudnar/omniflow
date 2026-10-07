@@ -5,6 +5,7 @@ describe('AiReplyService', () => {
   let prisma: any;
   let tenantContext: any;
   let messagesService: any;
+  let conversationsService: any;
   let openAiAdapter: any;
   let anthropicAdapter: any;
   let geminiAdapter: any;
@@ -38,6 +39,7 @@ describe('AiReplyService', () => {
     };
     tenantContext = { setContext: jest.fn() };
     messagesService = { create: jest.fn(), sendQuickReplies: jest.fn(), sendForm: jest.fn() };
+    conversationsService = { generateWebLink: jest.fn().mockResolvedValue({ url: 'http://localhost:3000/chat/webtoken1', token: 'webtoken1' }) };
     openAiAdapter = { complete: jest.fn() };
     anthropicAdapter = { complete: jest.fn() };
     geminiAdapter = { complete: jest.fn() };
@@ -50,6 +52,7 @@ describe('AiReplyService', () => {
       prisma,
       tenantContext,
       messagesService,
+      conversationsService,
       openAiAdapter,
       anthropicAdapter,
       geminiAdapter,
@@ -529,6 +532,45 @@ describe('AiReplyService', () => {
       await service.generateReply('t1', 'conv1', 'msg1');
 
       expect(messagesService.sendForm).not.toHaveBeenCalled();
+    });
+
+    it('sends the web-chat continuation link when the channel is not WEBCHAT and the tool is enabled', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue({ ...baseConversation, channel: 'WHATSAPP' });
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: ['send_webchat_link'] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'prefiero escribir desde la compu' });
+      openAiAdapter.complete.mockResolvedValue({
+        content: '',
+        promptTokens: 10,
+        completionTokens: 4,
+        toolCalls: [{ name: 'send_webchat_link', arguments: JSON.stringify({ message: 'Dale, seguimos por acá' }) }],
+      });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(conversationsService.generateWebLink).toHaveBeenCalledWith('conv1');
+      expect(messagesService.create).toHaveBeenCalledWith('conv1', 'agent-1', {
+        direction: 'OUTBOUND',
+        type: 'CTA',
+        content: 'Dale, seguimos por acá\n\nhttp://localhost:3000/chat/webtoken1',
+        ctaPayload: { action: 'STORE', url: 'http://localhost:3000/chat/webtoken1', label: 'Continuar por chat web' },
+      });
+    });
+
+    it('rejects send_webchat_link on a WEBCHAT conversation, even if the tool is enabled', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(baseConversation);
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ enabledTools: ['send_webchat_link'] })]);
+      prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'hola' });
+      openAiAdapter.complete.mockResolvedValue({
+        content: '',
+        promptTokens: 10,
+        completionTokens: 4,
+        toolCalls: [{ name: 'send_webchat_link', arguments: JSON.stringify({ message: 'Dale, seguimos por acá' }) }],
+      });
+
+      await service.generateReply('t1', 'conv1', 'msg1');
+
+      expect(conversationsService.generateWebLink).not.toHaveBeenCalled();
+      expect(messagesService.create).not.toHaveBeenCalled();
     });
   });
 

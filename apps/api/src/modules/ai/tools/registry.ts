@@ -297,6 +297,23 @@ export const CONVERSATION_TOOLS: ToolDefinition[] = [
       required: ['message', 'fields'],
     },
   },
+  {
+    name: 'send_webchat_link',
+    description:
+      'Envía al cliente un enlace para seguir la conversación desde el navegador (chat web), con todo el historial. Útil cuando el cliente quiere más comodidad para escribir o seguir más tarde. Nunca la uses si la conversación ya es por chat web.',
+    riskLevel: 'write',
+    terminal: true,
+    parameters: {
+      type: 'object',
+      properties: {
+        message: {
+          type: 'string',
+          description: 'Mensaje breve y amigable (1-2 frases) que acompaña el enlace, en el idioma configurado del agente. No incluyas la URL, se agrega automáticamente.',
+        },
+      },
+      required: ['message'],
+    },
+  },
 ];
 
 export const ALL_TOOLS: ToolDefinition[] = [...ECOMMERCE_TOOLS, ...BOOKING_TOOLS, ...CONVERSATION_TOOLS];
