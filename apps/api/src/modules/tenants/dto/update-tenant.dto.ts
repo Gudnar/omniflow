@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MinLength, IsIn, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, MinLength, IsIn, IsBoolean, IsInt, Min } from 'class-validator';
 
 export class UpdateTenantDto {
   @IsString()
@@ -69,6 +69,11 @@ export class UpdateTenantDto {
   @IsBoolean()
   @IsOptional()
   declare notifyOnAppointmentConfirmed?: boolean;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  declare whatsappFreeWindowHours?: number;
 
   @IsBoolean()
   @IsOptional()

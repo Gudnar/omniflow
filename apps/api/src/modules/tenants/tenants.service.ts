@@ -24,6 +24,7 @@ const TENANT_SELECT = {
   notifyOnAppointmentPendingApproval: true,
   notifyOnOrderConfirmed: true,
   notifyOnAppointmentConfirmed: true,
+  whatsappFreeWindowHours: true,
   sendAppointmentQrCode: true,
   sendAppointmentReceiptImage: true,
   sendOrderQrCode: true,

@@ -31,6 +31,7 @@ export interface Tenant {
   notifyOnAppointmentPendingApproval: boolean;
   notifyOnOrderConfirmed: boolean;
   notifyOnAppointmentConfirmed: boolean;
+  whatsappFreeWindowHours: number;
   sendAppointmentQrCode: boolean;
   sendAppointmentReceiptImage: boolean;
   sendOrderQrCode: boolean;

@@ -40,6 +40,7 @@ describe('MetaWebhookService', () => {
         contactChannel: { findFirst: jest.fn() },
         conversation: { findFirst: jest.fn(), update: jest.fn() },
         ecommerceStore: { findUnique: jest.fn().mockResolvedValue(null) },
+        tenant: { findUnique: jest.fn().mockResolvedValue({ whatsappFreeWindowHours: 72 }) },
       },
     };
     tenantContext = { setContext: jest.fn(), getTenantId: jest.fn().mockReturnValue('tenant-1') };
@@ -369,6 +370,59 @@ describe('MetaWebhookService', () => {
           expect.objectContaining({ type: 'CTA', ctaPayload: expect.objectContaining({ label: 'Continuar por web' }) }),
         );
         expect(prisma.client.conversation.update).toHaveBeenCalledWith({ where: { id: 'conv1' }, data: { aiPaused: true } });
+      });
+    });
+
+    describe('WhatsApp free-window expiry on an already-open conversation', () => {
+      beforeEach(() => {
+        prisma.raw.metaConnection.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+        prisma.raw.message.findUnique.mockResolvedValue(null);
+        prisma.client.contactChannel.findFirst.mockResolvedValue({ id: 'cc1', contactId: 'ct1' });
+        prisma.client.ecommerceStore.findUnique.mockResolvedValue(null);
+      });
+
+      it('redirects to the web chat on the SAME conversation once the tenant\'s free window has lapsed', async () => {
+        prisma.client.tenant.findUnique.mockResolvedValue({ whatsappFreeWindowHours: 72 });
+        const staleDate = new Date(Date.now() - 73 * 60 * 60 * 1000); // 73h ago, just past 72h
+        prisma.client.conversation.findFirst.mockResolvedValue({ id: 'conv1', status: 'OPEN', lastMessageAt: staleDate });
+
+        await service.handlePayload(buildWhatsAppPayload(buildWhatsAppValue()));
+
+        expect(messagesService.create).toHaveBeenCalledWith(
+          'conv1',
+          undefined,
+          expect.objectContaining({ direction: 'INBOUND', content: 'Hola', skipAiReply: true }),
+        );
+        // The web-chat CTA from sendReturningContactOptions, on the SAME conv1 — not a new conversation.
+        expect(conversationsService.create).not.toHaveBeenCalled();
+        expect(conversationsService.generateWebLink).toHaveBeenCalledWith('conv1');
+        expect(prisma.client.conversation.update).toHaveBeenCalledWith({ where: { id: 'conv1' }, data: { aiPaused: true } });
+      });
+
+      it('keeps responding normally while still inside the free window', async () => {
+        prisma.client.tenant.findUnique.mockResolvedValue({ whatsappFreeWindowHours: 72 });
+        const freshDate = new Date(Date.now() - 1 * 60 * 60 * 1000); // 1h ago, well inside 72h
+        prisma.client.conversation.findFirst.mockResolvedValue({ id: 'conv1', status: 'OPEN', lastMessageAt: freshDate });
+
+        await service.handlePayload(buildWhatsAppPayload(buildWhatsAppValue()));
+
+        expect(messagesService.create).toHaveBeenCalledWith(
+          'conv1',
+          undefined,
+          expect.objectContaining({ direction: 'INBOUND', content: 'Hola' }),
+        );
+        expect(messagesService.create).not.toHaveBeenCalledWith('conv1', undefined, expect.objectContaining({ skipAiReply: true }));
+        expect(conversationsService.generateWebLink).not.toHaveBeenCalled();
+      });
+
+      it('uses the tenant\'s configured window instead of the 72h default', async () => {
+        prisma.client.tenant.findUnique.mockResolvedValue({ whatsappFreeWindowHours: 1 });
+        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+        prisma.client.conversation.findFirst.mockResolvedValue({ id: 'conv1', status: 'OPEN', lastMessageAt: twoHoursAgo });
+
+        await service.handlePayload(buildWhatsAppPayload(buildWhatsAppValue()));
+
+        expect(conversationsService.generateWebLink).toHaveBeenCalledWith('conv1');
       });
     });
   });

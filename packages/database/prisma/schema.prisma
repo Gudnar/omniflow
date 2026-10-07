@@ -76,6 +76,14 @@ model Tenant {
   notifyOnOrderConfirmed Boolean @default(true)
   notifyOnAppointmentConfirmed Boolean @default(true)
 
+  // Hours since the customer's last message that WhatsApp still counts as a
+  // free service window — past this, MetaWebhookService redirects to the
+  // web chat instead of letting the agent keep answering on WhatsApp itself
+  // (every reply there is billed by Meta once the window has lapsed).
+  // Configurable because the real window depends on each tenant's own Meta
+  // account/category.
+  whatsappFreeWindowHours Int @default(72)
+
   // Automatic post-confirmation "ticket" images sent into the originating
   // conversation (ConfirmationImagesService) — a QR code encoding a plain-text
   // summary, and/or a rendered receipt image. Independently toggleable per

@@ -56,4 +56,11 @@ export class CreateMessageDto {
   // decide whether the NEXT outbound reply on this conversation should
   // re-dispatch to the real channel or stay web-only.
   declare viaWebWindow?: boolean;
+
+  // Internal-only, same protection as viaWebWindow above — set exclusively
+  // by MetaWebhookService when this INBOUND message arrived after the
+  // tenant's whatsappFreeWindowHours lapsed: the message still gets saved,
+  // but the normal AI-reply job is skipped because sendReturningContactOptions
+  // (called right after) pauses the agent on this conversation instead.
+  declare skipAiReply?: boolean;
 }

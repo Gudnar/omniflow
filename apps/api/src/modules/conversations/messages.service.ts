@@ -121,7 +121,7 @@ export class MessagesService {
         // runs once AiTranscriptionService fills in the real transcript;
         // enqueueing an AI reply now would hand the agent an empty message.
         await this.queueService.enqueueTranscription((conversation as any).tenantId, message.id);
-      } else {
+      } else if (!dto.skipAiReply) {
         // Phase 13: AI foundation — off the hot path, mirrors enqueueWorkflowEvent
         // right above. AiReplyService (via apps/worker) decides whether any
         // agent should actually respond.

@@ -339,6 +339,30 @@ describe('MessagesService', () => {
       });
     });
 
+    // Used by MetaWebhookService when a WhatsApp message arrives after the
+    // tenant's free-window has lapsed: the message still gets saved, but the
+    // normal AI reply is skipped because sendReturningContactOptions pauses
+    // the agent right after instead.
+    describe('skipAiReply', () => {
+      it('still saves the message and emits message.created, but does not enqueue an AI reply', async () => {
+        conversationsService.findOne.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1', channel: 'WHATSAPP' });
+
+        await service.create('conv1', '', { direction: 'INBOUND', content: 'Hola', skipAiReply: true } as any);
+
+        expect(tx.message.create).toHaveBeenCalled();
+        expect(eventEmitter.emit).toHaveBeenCalledWith('message.created', { conversationId: 'conv1', tenantId: 'tenant-1' });
+        expect(queueService.enqueueAiReply).not.toHaveBeenCalled();
+      });
+
+      it('still enqueues an AI reply when skipAiReply is not set', async () => {
+        conversationsService.findOne.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1', channel: 'WHATSAPP' });
+
+        await service.create('conv1', '', { direction: 'INBOUND', content: 'Hola' } as any);
+
+        expect(queueService.enqueueAiReply).toHaveBeenCalledWith('tenant-1', 'conv1', 'msg1');
+      });
+    });
+
     it('does not enqueue for the reserved/unused FACEBOOK channel', async () => {
       conversationsService.findOne.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1', channel: 'FACEBOOK' });
 

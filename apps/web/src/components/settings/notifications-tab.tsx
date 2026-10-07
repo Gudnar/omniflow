@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, Bell, PackageCheck, CalendarClock } from 'lucide-react';
+import { ArrowRight, Bell, PackageCheck, CalendarClock, Clock } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPatch } from '@/lib/api-client';
@@ -13,6 +13,8 @@ export function NotificationsTab() {
   const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [windowHours, setWindowHours] = useState<number | ''>('');
+  const [savingWindow, setSavingWindow] = useState(false);
 
   useEffect(() => {
     if (!tokens) return;
@@ -21,6 +23,24 @@ export function NotificationsTab() {
       .catch((err) => console.error('Error fetching tenant:', err))
       .finally(() => setLoading(false));
   }, [tokens]);
+
+  useEffect(() => {
+    if (tenant) setWindowHours(tenant.whatsappFreeWindowHours);
+  }, [tenant]);
+
+  const saveWindowHours = async () => {
+    if (!tenant || windowHours === '' || windowHours < 1) return;
+    setSavingWindow(true);
+    try {
+      await apiPatch('/tenant', tokens?.accessToken, { whatsappFreeWindowHours: windowHours });
+      setTenant({ ...tenant, whatsappFreeWindowHours: windowHours });
+      toast.success('Ventana de WhatsApp actualizada');
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo actualizar la ventana');
+    } finally {
+      setSavingWindow(false);
+    }
+  };
 
   const toggle = async (
     field:
@@ -139,6 +159,35 @@ export function NotificationsTab() {
       </div>
 
       <div className="space-y-5">
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <h3 className="text-base font-bold text-gray-900 mb-1 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-gray-400" /> Costo de mensajes de WhatsApp
+          </h3>
+          <p className="text-sm text-gray-500 mb-4">
+            Pasadas estas horas desde el último mensaje del cliente, Meta empieza a cobrar cada respuesta. En vez de
+            seguir respondiendo por WhatsApp, el sistema le manda las opciones (tienda, reservar, chat web) y lo
+            deriva al chat web, donde la conversación sigue siendo gratis.
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min={1}
+              value={windowHours}
+              onChange={(e) => setWindowHours(e.target.value === '' ? '' : Number(e.target.value))}
+              disabled={savingWindow}
+              className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+            <span className="text-sm text-gray-500">horas</span>
+            <button
+              onClick={saveWindowHours}
+              disabled={savingWindow || windowHours === tenant.whatsappFreeWindowHours}
+              className="ml-auto px-3 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium disabled:opacity-50"
+            >
+              Guardar
+            </button>
+          </div>
+        </div>
+
         <div className="bg-white rounded-xl border border-gray-200 p-5">
           <h3 className="text-base font-bold text-gray-900 mb-1">Automatizaciones avanzadas</h3>
           <p className="text-sm text-gray-500 mb-4">

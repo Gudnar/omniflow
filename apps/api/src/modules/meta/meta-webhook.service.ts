@@ -325,6 +325,38 @@ export class MetaWebhookService {
       return;
     }
 
+    // WhatsApp's free service window is counted from the customer's last
+    // message, not from whether the conversation is still "open" — nothing
+    // auto-closes a Conversation, so a contact can keep writing into the
+    // same open thread for weeks after the window lapsed, and every agent
+    // reply there is billed by Meta from that point on. Once it's past
+    // whatsappFreeWindowHours, treat this exactly like the "no open
+    // conversation" brake above, but on the SAME conversation (so the web
+    // chat hand-off keeps the full history) instead of creating a new one.
+    if (channel === 'WHATSAPP' && openConversation.lastMessageAt) {
+      const tenantId = this.tenantContext.getTenantId();
+      if (tenantId) {
+        const tenant = await this.prisma.client.tenant.findUnique({
+          where: { id: tenantId },
+          select: { whatsappFreeWindowHours: true },
+        });
+        const windowMs = (tenant?.whatsappFreeWindowHours ?? 72) * 60 * 60 * 1000;
+        const windowExpired = Date.now() - openConversation.lastMessageAt.getTime() > windowMs;
+
+        if (windowExpired) {
+          await this.messagesService.create(openConversation.id, undefined as any, {
+            direction: 'INBOUND',
+            type: msg.type ?? 'TEXT',
+            content: msg.content,
+            externalId: msg.externalMessageId,
+            skipAiReply: true,
+          } as any);
+          await this.sendReturningContactOptions(tenantId, openConversation.id, contactChannel.contactId);
+          return;
+        }
+      }
+    }
+
     let attachment: { url: string; mimeType: string; fileName: string; size: number } | undefined;
     if (msg.type === 'AUDIO' && msg.audio) {
       const tenantId = this.tenantContext.getTenantId();
