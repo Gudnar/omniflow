@@ -20,6 +20,23 @@ const WHATSAPP_BUTTON_TITLE_MAX = 20;
 // non-WEBCHAT conversation, so this is a defensive fallback, not the normal
 // path.
 function buildOutboundBody(message: any, to: string): Record<string, unknown> {
+  // An attachment takes priority over message.type's own branches below —
+  // e.g. ConfirmationImagesService sends plain type:'TEXT' messages that
+  // carry a QR/receipt image via a related Attachment row. Without this,
+  // the fallback at the bottom would silently send only the caption text
+  // (exactly the bug reported: image never arrives on real WhatsApp).
+  const imageAttachment = (message.attachments ?? []).find((a: any) =>
+    a.mimeType?.startsWith('image/'),
+  );
+  if (imageAttachment) {
+    return {
+      messaging_product: 'whatsapp',
+      to,
+      type: 'image',
+      image: message.content ? { link: imageAttachment.url, caption: message.content } : { link: imageAttachment.url },
+    };
+  }
+
   if (message.type === 'TEMPLATE' && message.templatePayload) {
     return { messaging_product: 'whatsapp', to, type: 'template', template: message.templatePayload };
   }
@@ -82,7 +99,10 @@ function buildOutboundBody(message: any, to: string): Record<string, unknown> {
 export async function processWhatsAppOutboundJob(data: ChannelOutboundJobData): Promise<void> {
   const { messageId } = data;
 
-  const message = await prisma.message.findUnique({ where: { id: messageId } });
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    include: { attachments: true },
+  });
   if (!message) {
     logger.error('WhatsApp outbound job: message not found', undefined, { messageId });
     return;

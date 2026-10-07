@@ -334,17 +334,27 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
                 }`}
               >
                 <p className={`text-sm ${isOutbound ? '' : 'text-gray-800'}`}>{m.content}</p>
-                {m.attachments.map((a) => (
-                  <a
-                    key={a.id}
-                    href={a.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={`block text-xs underline mt-1 ${isOutbound ? 'text-blue-100' : 'text-blue-600'}`}
-                  >
-                    {a.fileName}
-                  </a>
-                ))}
+                {m.attachments.map((a) =>
+                  a.mimeType?.startsWith('image/') ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      key={a.id}
+                      src={a.url}
+                      alt={a.fileName}
+                      className="mt-2 max-w-full rounded-lg"
+                    />
+                  ) : (
+                    <a
+                      key={a.id}
+                      href={a.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`block text-xs underline mt-1 ${isOutbound ? 'text-blue-100' : 'text-blue-600'}`}
+                    >
+                      {a.fileName}
+                    </a>
+                  ),
+                )}
                 <p className={`text-[10px] text-right mt-1 ${isOutbound ? 'text-blue-100' : 'text-gray-400'}`}>
                   {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </p>

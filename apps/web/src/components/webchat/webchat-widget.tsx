@@ -195,12 +195,17 @@ export function WebchatWidget({
             );
           }
 
+          const imageAttachment = m.attachments?.find((a) => a.mimeType.startsWith('image/'));
           return (
             <div key={m.id} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
               <div
                 className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm ${isMine ? 'text-white' : 'bg-gray-100 text-gray-800'}`}
                 style={isMine ? { backgroundColor: primaryColor } : undefined}
               >
+                {imageAttachment && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={imageAttachment.url} alt={m.content || imageAttachment.fileName} className="max-w-full rounded-lg mb-1" />
+                )}
                 {m.content}
               </div>
             </div>

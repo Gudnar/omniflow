@@ -919,6 +919,7 @@ export interface WebchatMessage {
   createdAt: string;
   ctaPayload?: { action: 'STORE' | 'BOOKING'; url: string; label: string } | null;
   interactivePayload?: InteractivePayload | null;
+  attachments?: Attachment[];
 }
 
 // GET /analytics/overview — backs the dashboard home page. `changePct` is

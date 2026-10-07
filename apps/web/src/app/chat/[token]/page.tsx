@@ -242,6 +242,7 @@ export default function ConversationWindowPage() {
             );
           }
 
+          const imageAttachment = m.attachments?.find((a) => a.mimeType.startsWith('image/'));
           return (
             <div key={m.id}>
               {dateSeparator}
@@ -250,6 +251,10 @@ export default function ConversationWindowPage() {
                   className="relative max-w-[75%] px-2.5 pt-1.5 pb-1.5 text-sm shadow-sm"
                   style={{ backgroundColor: isMine ? '#dcf8c6' : '#ffffff', ...bubbleRadius }}
                 >
+                  {imageAttachment && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={imageAttachment.url} alt={m.content || imageAttachment.fileName} className="max-w-full rounded-lg mb-1" />
+                  )}
                   <p className="text-gray-800 whitespace-pre-wrap pr-1" style={{ wordBreak: 'break-word' }}>
                     {m.content}
                   </p>
