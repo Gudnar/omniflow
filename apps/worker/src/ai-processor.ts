@@ -8,7 +8,9 @@ const INTERNAL_SECRET = process.env.WORKER_INTERNAL_SECRET || 'dev-internal-secr
 export interface AiReplyJobData {
   tenantId: string;
   conversationId: string;
-  messageId: string;
+  // null — the proactive "welcome to web chat" greeting, with no real
+  // customer message that triggered it. See AiReplyService.generateReply.
+  messageId: string | null;
 }
 
 export async function processAiReplyJob(data: AiReplyJobData): Promise<void> {

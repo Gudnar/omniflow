@@ -110,7 +110,7 @@ export class QueueService implements OnModuleDestroy {
     );
   }
 
-  async enqueueAiReply(tenantId: string, conversationId: string, messageId: string): Promise<void> {
+  async enqueueAiReply(tenantId: string, conversationId: string, messageId: string | null): Promise<void> {
     await this.aiRepliesQueue.add(
       'reply',
       { tenantId, conversationId, messageId },

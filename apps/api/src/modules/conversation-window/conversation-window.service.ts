@@ -3,6 +3,7 @@ import { NotFoundError } from '@omniflow/utils';
 import { PrismaService } from '../prisma/prisma.service';
 import { TenantContextService } from '../tenant-context/tenant-context.service';
 import { MessagesService } from '../conversations/messages.service';
+import { QueueService } from '../queue/queue.service';
 
 // Never expose these to a customer-facing view — NOTE is staff-only
 // shorthand ("Nota interna" in chat-panel.tsx) and SYSTEM is our own
@@ -26,6 +27,7 @@ export class ConversationWindowService {
     private prisma: PrismaService,
     private tenantContext: TenantContextService,
     private messagesService: MessagesService,
+    private queueService: QueueService,
   ) {}
 
   private async requireConversation(token: string) {
@@ -37,6 +39,19 @@ export class ConversationWindowService {
 
   async getWindow(token: string) {
     const conversation = await this.requireConversation(token);
+
+    // Proactive "welcome to web chat" greeting — fires once per active link.
+    // The updateMany's own where clause is what makes this race-safe: the
+    // socket re-calls getWindow() on every message.created, including the
+    // greeting's own reply, so only the very first caller to see
+    // webWindowGreetedAt: null actually wins the race and enqueues it.
+    const { count } = await this.prisma.client.conversation.updateMany({
+      where: { id: conversation.id, webWindowGreetedAt: null },
+      data: { webWindowGreetedAt: new Date(), aiPaused: false },
+    });
+    if (count > 0) {
+      await this.queueService.enqueueAiReply(conversation.tenantId, conversation.id, null);
+    }
 
     // Prefer the channel's own connection display name (e.g. the WhatsApp
     // number's verified business name) for the header; MetaConnection has

@@ -638,6 +638,12 @@ model Conversation {
   // manually (ConversationsService.setAiPaused) to hand control back to AI.
   aiPaused Boolean @default(false)
 
+  // null = the proactive "welcome to web chat" greeting hasn't fired yet for
+  // the CURRENT webchatToken. Reset to null every time generateWebLink()
+  // mints a fresh token, so a link resent later greets again;
+  // getOrCreateWebLink()'s reuse path leaves it alone.
+  webWindowGreetedAt DateTime?
+
   lastMessageAt DateTime?
 
   createdAt DateTime @default(now())

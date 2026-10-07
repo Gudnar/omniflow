@@ -6,6 +6,7 @@ describe('ConversationWindowService', () => {
   let prisma: any;
   let tenantContext: any;
   let messagesService: any;
+  let queueService: any;
 
   beforeEach(() => {
     prisma = {
@@ -15,10 +16,14 @@ describe('ConversationWindowService', () => {
         tenant: { findUnique: jest.fn() },
         message: { findMany: jest.fn() },
       },
+      client: {
+        conversation: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      },
     };
     tenantContext = { setContext: jest.fn() };
     messagesService = { create: jest.fn() };
-    service = new ConversationWindowService(prisma, tenantContext, messagesService);
+    queueService = { enqueueAiReply: jest.fn() };
+    service = new ConversationWindowService(prisma, tenantContext, messagesService, queueService);
   });
 
   describe('getWindow', () => {
@@ -135,6 +140,35 @@ describe('ConversationWindowService', () => {
           ctaPayload: { action: 'STORE', url: 'http://localhost:3000/tienda/demo?s=abc' },
         }),
       );
+    });
+
+    describe('proactive web-chat greeting', () => {
+      beforeEach(() => {
+        prisma.raw.conversation.findUnique.mockResolvedValue({ id: 'conv1', tenantId: 't1', channel: 'WHATSAPP' });
+        prisma.raw.metaConnection.findUnique.mockResolvedValue(null);
+        prisma.raw.tenant.findUnique.mockResolvedValue({ name: 'Demo', logo: null });
+        prisma.raw.message.findMany.mockResolvedValue([]);
+      });
+
+      it('on the first open, clears aiPaused, marks webWindowGreetedAt, and enqueues the greeting with no messageId', async () => {
+        prisma.client.conversation.updateMany.mockResolvedValue({ count: 1 });
+
+        await service.getWindow('token');
+
+        expect(prisma.client.conversation.updateMany).toHaveBeenCalledWith({
+          where: { id: 'conv1', webWindowGreetedAt: null },
+          data: { webWindowGreetedAt: expect.any(Date), aiPaused: false },
+        });
+        expect(queueService.enqueueAiReply).toHaveBeenCalledWith('t1', 'conv1', null);
+      });
+
+      it('does not re-enqueue on a later open once already greeted', async () => {
+        prisma.client.conversation.updateMany.mockResolvedValue({ count: 0 });
+
+        await service.getWindow('token');
+
+        expect(queueService.enqueueAiReply).not.toHaveBeenCalled();
+      });
     });
   });
 

@@ -280,7 +280,7 @@ describe('ConversationsService', () => {
 
       expect(prisma.client.conversation.update).toHaveBeenCalledWith({
         where: { id: 'conv1' },
-        data: { webchatToken: expect.any(String) },
+        data: { webchatToken: expect.any(String), webWindowGreetedAt: null },
       });
       const [[{ data }]] = prisma.client.conversation.update.mock.calls;
       expect(result).toEqual({ url: expect.stringContaining(`/chat/${data.webchatToken}`), token: data.webchatToken });
@@ -293,6 +293,17 @@ describe('ConversationsService', () => {
       const result = await service.generateWebLink('conv1');
 
       expect(result.token).not.toBe('old-token');
+    });
+
+    it('resets webWindowGreetedAt so the proactive greeting fires again on the new link', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1', webchatToken: 'old-token', webWindowGreetedAt: new Date() });
+      prisma.client.conversation.update.mockResolvedValue({ id: 'conv1' });
+
+      await service.generateWebLink('conv1');
+
+      expect(prisma.client.conversation.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ webWindowGreetedAt: null }) }),
+      );
     });
   });
 
@@ -314,7 +325,7 @@ describe('ConversationsService', () => {
 
       expect(prisma.client.conversation.update).toHaveBeenCalledWith({
         where: { id: 'conv1' },
-        data: { webchatToken: expect.any(String) },
+        data: { webchatToken: expect.any(String), webWindowGreetedAt: null },
       });
       expect(result.token).toBeTruthy();
     });

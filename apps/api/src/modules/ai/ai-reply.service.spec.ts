@@ -218,6 +218,41 @@ describe('AiReplyService', () => {
     });
   });
 
+  describe('proactive web-chat greeting (no messageId)', () => {
+    it('skips the message lookup and escalation check, appends the synthetic instruction, and sends the reply', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue({
+        id: 'conv1',
+        assignedToId: null,
+        status: 'OPEN',
+        channel: 'WHATSAPP',
+        aiPaused: false,
+        contact: { id: 'c1', name: 'Ana' },
+      });
+      prisma.client.aiAgent.findMany.mockResolvedValue([openAgent({ escalationKeywords: ['reembolso'] })]);
+      prisma.client.message.findMany.mockResolvedValue([{ direction: 'OUTBOUND', content: 'O seguimos por acá: http://...' }]);
+      openAiAdapter.complete.mockResolvedValue({ content: '¡Hola de nuevo! Acá te voy a dar mejor atención.', promptTokens: 12, completionTokens: 9 });
+
+      await service.generateReply('t1', 'conv1', null);
+
+      expect(prisma.client.message.findUnique).not.toHaveBeenCalled();
+      expect(knowledgeSearchService.search).not.toHaveBeenCalled();
+      const [[callArgs]] = openAiAdapter.complete.mock.calls;
+      const lastMessage = callArgs.messages[callArgs.messages.length - 1];
+      expect(lastMessage).toEqual({ role: 'user', content: expect.stringContaining('acaba de abrir esta ventana de chat web') });
+      expect(messagesService.create).toHaveBeenCalledWith('conv1', 'agent-1', {
+        direction: 'OUTBOUND',
+        type: 'TEXT',
+        content: '¡Hola de nuevo! Acá te voy a dar mejor atención.',
+      });
+    });
+
+    it('still respects aiPaused and the other eligibility gates', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1', assignedToId: null, status: 'OPEN', channel: 'WHATSAPP', aiPaused: true });
+      await service.generateReply('t1', 'conv1', null);
+      expect(prisma.client.aiAgent.findMany).not.toHaveBeenCalled();
+    });
+  });
+
   it('queries the knowledge base with the agent id and the triggering message, injecting matches into the system prompt', async () => {
     prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1', assignedToId: null, status: 'OPEN', channel: 'WHATSAPP' });
     prisma.client.aiAgent.findMany.mockResolvedValue([openAgent()]);

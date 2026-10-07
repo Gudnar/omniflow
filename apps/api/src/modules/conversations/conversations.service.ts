@@ -176,7 +176,10 @@ export class ConversationsService {
   async generateWebLink(id: string) {
     await this.findOne(id);
     const webchatToken = randomBytes(32).toString('hex');
-    await this.prisma.client.conversation.update({ where: { id }, data: { webchatToken } });
+    // A fresh token means a fresh session — webWindowGreetedAt resets so the
+    // proactive greeting (ConversationWindowService.getWindow) fires again
+    // the next time this new link is opened.
+    await this.prisma.client.conversation.update({ where: { id }, data: { webchatToken, webWindowGreetedAt: null } });
 
     const baseUrl = process.env.STOREFRONT_BASE_URL || 'http://localhost:3000';
     return { url: `${baseUrl}/chat/${webchatToken}`, token: webchatToken };

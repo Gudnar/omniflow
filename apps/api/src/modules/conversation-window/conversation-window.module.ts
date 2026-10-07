@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { ConversationsModule } from '../conversations/conversations.module';
+import { QueueModule } from '../queue/queue.module';
 import { ConversationWindowController } from './conversation-window.controller';
 import { ConversationWindowService } from './conversation-window.service';
 
 @Module({
-  imports: [PrismaModule, ConversationsModule],
+  imports: [PrismaModule, ConversationsModule, QueueModule],
   controllers: [ConversationWindowController],
   providers: [ConversationWindowService],
 })

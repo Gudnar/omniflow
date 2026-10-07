@@ -30,6 +30,13 @@ const SEND_WEBCHAT_LINK_TOOL = 'send_webchat_link';
 const TERMINAL_TOOL_NAMES = new Set([SEND_STOREFRONT_LINK_TOOL, SEND_QUICK_REPLIES_TOOL, SEND_FORM_TOOL, SEND_WEBCHAT_LINK_TOOL]);
 const MAX_CTA_MESSAGE_LENGTH = 300;
 const FORM_FIELD_TYPES = new Set(['text', 'email', 'tel', 'number']);
+// Appended as the final turn when generateReply runs with no messageId (the
+// proactive "customer just opened the web-chat window" greeting) — never
+// persisted as a Message, the customer never "sees" this text, it only
+// steers the model's next completion. Framed as a system aside so the model
+// doesn't mistake it for something the customer actually typed.
+const PROACTIVE_GREETING_INSTRUCTION =
+  'Aviso del sistema (esto no lo escribió el cliente): acaba de abrir esta ventana de chat web, redirigido desde WhatsApp. Saludalo de nuevo con naturalidad y comentale brevemente que desde acá le vas a poder dar mejor atención. No repitas el enlace que ya se le mandó antes.';
 // Hard ceiling on how many times one reply can round-trip through a tool
 // call before giving up and treating whatever text the model has produced
 // (often none) as final — guards against a model stuck calling tools in a
@@ -126,7 +133,7 @@ export class AiReplyService {
     };
   }
 
-  async generateReply(tenantId: string, conversationId: string, messageId: string): Promise<void> {
+  async generateReply(tenantId: string, conversationId: string, messageId?: string | null): Promise<void> {
     this.tenantContext.setContext({ tenantId });
 
     const conversation = await this.prisma.client.conversation.findUnique({
@@ -161,13 +168,20 @@ export class AiReplyService {
     const apiKey = await this.aiCredentialsService.getDecrypted(tenantId, agent.model.providerId);
     if (!apiKey) return;
 
-    const triggeringMessage = await this.prisma.client.message.findUnique({ where: { id: messageId } });
-    if (!triggeringMessage || triggeringMessage.direction !== 'INBOUND') return;
+    // No messageId at all means this is the proactive "customer just opened
+    // the web-chat window" greeting (ConversationWindowService.getWindow) —
+    // there's no real customer message to validate or scan for escalation
+    // keywords against.
+    let triggeringMessage: { content: string; direction: string } | null = null;
+    if (messageId) {
+      triggeringMessage = await this.prisma.client.message.findUnique({ where: { id: messageId } });
+      if (!triggeringMessage || triggeringMessage.direction !== 'INBOUND') return;
 
-    const lowerContent = triggeringMessage.content.toLowerCase();
-    if (agent.escalationKeywords.some((kw: string) => lowerContent.includes(kw.toLowerCase()))) {
-      logger.info('AI reply skipped: escalation keyword matched', { conversationId, agentId: agent.id });
-      return;
+      const lowerContent = triggeringMessage.content.toLowerCase();
+      if (agent.escalationKeywords.some((kw: string) => lowerContent.includes(kw.toLowerCase()))) {
+        logger.info('AI reply skipped: escalation keyword matched', { conversationId, agentId: agent.id });
+        return;
+      }
     }
 
     // AUDIO is included alongside TEXT: by the time this runs, an AUDIO
@@ -182,7 +196,9 @@ export class AiReplyService {
     });
     const ordered = history.slice().reverse();
 
-    const knowledgeChunks = await this.knowledgeSearchService.search(agent.id, triggeringMessage.content);
+    const knowledgeChunks = triggeringMessage
+      ? await this.knowledgeSearchService.search(agent.id, triggeringMessage.content)
+      : [];
 
     const chatMessages: LlmMessage[] = [
       {
@@ -196,6 +212,7 @@ export class AiReplyService {
         role: m.direction === 'INBOUND' ? ('user' as const) : ('assistant' as const),
         content: m.content,
       })),
+      ...(!messageId ? [{ role: 'user' as const, content: PROACTIVE_GREETING_INSTRUCTION }] : []),
     ];
 
     // Read-only capability check — deliberately NOT EcommerceStoreService's
