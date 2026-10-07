@@ -27,6 +27,7 @@ describe('MetaWebhookService', () => {
   let templatesService: any;
   let storageService: any;
   let facebookCommentsService: any;
+  let contactCommerceService: any;
   const originalFetch = global.fetch;
 
   beforeEach(() => {
@@ -37,16 +38,23 @@ describe('MetaWebhookService', () => {
       },
       client: {
         contactChannel: { findFirst: jest.fn() },
-        conversation: { findFirst: jest.fn() },
+        conversation: { findFirst: jest.fn(), update: jest.fn() },
+        ecommerceStore: { findUnique: jest.fn().mockResolvedValue(null) },
       },
     };
     tenantContext = { setContext: jest.fn(), getTenantId: jest.fn().mockReturnValue('tenant-1') };
     contactsService = { create: jest.fn().mockResolvedValue({ id: 'ct1' }) };
-    conversationsService = { create: jest.fn().mockResolvedValue({ id: 'conv1' }) };
+    conversationsService = {
+      create: jest.fn().mockResolvedValue({ id: 'conv1' }),
+      generateWebLink: jest.fn().mockResolvedValue({ url: 'http://localhost:3000/chat/webtoken1', token: 'webtoken1' }),
+    };
     messagesService = { create: jest.fn().mockResolvedValue({ id: 'msg1' }) };
     templatesService = { findByExternalId: jest.fn(), applyStatusUpdate: jest.fn() };
     storageService = { saveAudioBuffer: jest.fn() };
     facebookCommentsService = { handleFeedChange: jest.fn() };
+    contactCommerceService = {
+      generateStorefrontLink: jest.fn().mockResolvedValue({ url: 'http://localhost:3000/tienda/demo?branchId=b1' }),
+    };
 
     service = new MetaWebhookService(
       prisma,
@@ -57,6 +65,7 @@ describe('MetaWebhookService', () => {
       templatesService,
       storageService,
       facebookCommentsService,
+      contactCommerceService,
     );
   });
 
@@ -299,7 +308,7 @@ describe('MetaWebhookService', () => {
       });
     });
 
-    it('starts a new conversation when the repeat sender has no open conversation', async () => {
+    it('starts a new conversation (skipping the normal AI reply) when the repeat sender has no open conversation', async () => {
       prisma.raw.metaConnection.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
       prisma.raw.message.findUnique.mockResolvedValue(null);
       prisma.client.contactChannel.findFirst.mockResolvedValue({ id: 'cc1', contactId: 'ct1' });
@@ -308,9 +317,59 @@ describe('MetaWebhookService', () => {
       await service.handlePayload(buildWhatsAppPayload(buildWhatsAppValue()));
 
       expect(conversationsService.create).toHaveBeenCalledWith(
-        expect.objectContaining({ contactId: 'ct1', channel: 'WHATSAPP' }),
+        expect.objectContaining({ contactId: 'ct1', channel: 'WHATSAPP', skipAiReply: true }),
       );
-      expect(messagesService.create).not.toHaveBeenCalled();
+    });
+
+    describe('returning WhatsApp contact one-shot CTA brake', () => {
+      beforeEach(() => {
+        prisma.raw.metaConnection.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+        prisma.raw.message.findUnique.mockResolvedValue(null);
+        prisma.client.contactChannel.findFirst.mockResolvedValue({ id: 'cc1', contactId: 'ct1' });
+        prisma.client.conversation.findFirst.mockResolvedValue(null);
+        conversationsService.create.mockResolvedValue({ id: 'conv1' });
+      });
+
+      it('sends store + booking + web-chat CTAs and pauses the AI when the store supports both', async () => {
+        prisma.client.ecommerceStore.findUnique.mockResolvedValue({ status: 'PUBLISHED', operationMode: 'BOTH' });
+
+        await service.handlePayload(buildWhatsAppPayload(buildWhatsAppValue()));
+
+        expect(contactCommerceService.generateStorefrontLink).toHaveBeenCalledWith('ct1');
+        expect(messagesService.create).toHaveBeenCalledTimes(3);
+        expect(messagesService.create).toHaveBeenCalledWith(
+          'conv1',
+          undefined,
+          expect.objectContaining({ type: 'CTA', ctaPayload: expect.objectContaining({ action: 'STORE', label: 'Ir a la tienda' }) }),
+        );
+        expect(messagesService.create).toHaveBeenCalledWith(
+          'conv1',
+          undefined,
+          expect.objectContaining({ type: 'CTA', ctaPayload: expect.objectContaining({ action: 'BOOKING', label: 'Reservar cita' }) }),
+        );
+        expect(messagesService.create).toHaveBeenCalledWith(
+          'conv1',
+          undefined,
+          expect.objectContaining({ type: 'CTA', ctaPayload: expect.objectContaining({ label: 'Continuar por chat web' }) }),
+        );
+        expect(conversationsService.generateWebLink).toHaveBeenCalledWith('conv1');
+        expect(prisma.client.conversation.update).toHaveBeenCalledWith({ where: { id: 'conv1' }, data: { aiPaused: true } });
+      });
+
+      it('only sends the web-chat CTA when the store is not published', async () => {
+        prisma.client.ecommerceStore.findUnique.mockResolvedValue(null);
+
+        await service.handlePayload(buildWhatsAppPayload(buildWhatsAppValue()));
+
+        expect(contactCommerceService.generateStorefrontLink).not.toHaveBeenCalled();
+        expect(messagesService.create).toHaveBeenCalledTimes(1);
+        expect(messagesService.create).toHaveBeenCalledWith(
+          'conv1',
+          undefined,
+          expect.objectContaining({ type: 'CTA', ctaPayload: expect.objectContaining({ label: 'Continuar por chat web' }) }),
+        );
+        expect(prisma.client.conversation.update).toHaveBeenCalledWith({ where: { id: 'conv1' }, data: { aiPaused: true } });
+      });
     });
   });
 
@@ -408,6 +467,22 @@ describe('MetaWebhookService', () => {
         expect.objectContaining({ direction: 'INBOUND', externalId: 'mid.TESTID001', content: 'Hola desde DM' }),
       );
       expect(contactsService.create).not.toHaveBeenCalled();
+    });
+
+    it('does NOT apply the WhatsApp one-shot CTA brake for a repeat sender with no open conversation', async () => {
+      prisma.raw.metaConnection.findUnique.mockResolvedValue({ tenantId: 'tenant-1' });
+      prisma.raw.message.findUnique.mockResolvedValue(null);
+      prisma.client.contactChannel.findFirst.mockResolvedValue({ id: 'cc1', contactId: 'ct1' });
+      prisma.client.conversation.findFirst.mockResolvedValue(null);
+      prisma.client.ecommerceStore.findUnique.mockResolvedValue({ status: 'PUBLISHED', operationMode: 'BOTH' });
+
+      await service.handlePayload(buildMessagingPayload(object, buildEvent()));
+
+      expect(conversationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ channel: expectedChannel, skipAiReply: false }),
+      );
+      expect(messagesService.create).not.toHaveBeenCalled();
+      expect(prisma.client.conversation.update).not.toHaveBeenCalled();
     });
   });
 

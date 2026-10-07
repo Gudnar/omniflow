@@ -116,7 +116,9 @@ export class ConversationsService {
     // MessagesService.create() does for every other INBOUND message.
     if (firstMessageId) {
       this.eventEmitter.emit('message.created', { conversationId: result.id, tenantId: (result as any).tenantId });
-      await this.queueService.enqueueAiReply((result as any).tenantId, result.id, firstMessageId);
+      if (!dto.skipAiReply) {
+        await this.queueService.enqueueAiReply((result as any).tenantId, result.id, firstMessageId);
+      }
     }
 
     return result;
@@ -128,6 +130,15 @@ export class ConversationsService {
       where: { id },
       data: { status: dto.status },
     });
+  }
+
+  // Lets an operator hand control back to the AI agent after the
+  // WhatsApp "returning contact" one-shot CTA flow paused it (see
+  // MetaWebhookService.processInboundMessage) — the only way out of that
+  // state short of replying manually forever.
+  async setAiPaused(id: string, aiPaused: boolean) {
+    await this.findOne(id);
+    return this.prisma.client.conversation.update({ where: { id }, data: { aiPaused } });
   }
 
   async assign(id: string, dto: AssignConversationDto, actorUserId: string) {

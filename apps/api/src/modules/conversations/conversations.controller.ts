@@ -6,6 +6,7 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 import { UpdateConversationStatusDto } from './dto/update-conversation-status.dto';
 import { AssignConversationDto } from './dto/assign-conversation.dto';
 import { ListConversationsQueryDto } from './dto/list-conversations-query.dto';
+import { SetAiPausedDto } from './dto/set-ai-paused.dto';
 
 @Controller('conversations')
 export class ConversationsController {
@@ -46,6 +47,13 @@ export class ConversationsController {
   @RequirePermission('conversations.manage')
   assign(@Param('id') id: string, @Body() dto: AssignConversationDto, @Request() req: any) {
     return this.conversationsService.assign(id, dto, req.user.userId);
+  }
+
+  @Patch(':id/ai-paused')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('conversations.manage')
+  setAiPaused(@Param('id') id: string, @Body() dto: SetAiPausedDto) {
+    return this.conversationsService.setAiPaused(id, dto.aiPaused);
   }
 
   @Post(':id/generate-web-link')

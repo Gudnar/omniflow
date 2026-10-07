@@ -85,6 +85,18 @@ describe('AiReplyService', () => {
     expect(prisma.client.aiAgent.findMany).not.toHaveBeenCalled();
   });
 
+  it('no-ops when the WhatsApp returning-contact one-shot CTA brake paused the AI on this conversation', async () => {
+    prisma.client.conversation.findUnique.mockResolvedValue({
+      id: 'conv1',
+      assignedToId: null,
+      status: 'OPEN',
+      channel: 'WHATSAPP',
+      aiPaused: true,
+    });
+    await service.generateReply('t1', 'conv1', 'msg1');
+    expect(prisma.client.aiAgent.findMany).not.toHaveBeenCalled();
+  });
+
   it('no-ops when there is no ACTIVE agent for the channel', async () => {
     prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1', assignedToId: null, status: 'OPEN', channel: 'WHATSAPP' });
     prisma.client.aiAgent.findMany.mockResolvedValue([]);
@@ -216,6 +228,47 @@ describe('AiReplyService', () => {
     const [[callArgs]] = openAiAdapter.complete.mock.calls;
     const systemMessage = callArgs.messages.find((m: any) => m.role === 'system');
     expect(systemMessage.content).toContain('Atendemos de lunes a sábado, 9am a 7pm.');
+  });
+
+  it('tells the model this is a new cold-ad contact and names the ad headline, when present', async () => {
+    prisma.client.conversation.findUnique.mockResolvedValue({
+      id: 'conv1',
+      assignedToId: null,
+      status: 'OPEN',
+      channel: 'WHATSAPP',
+      isNewContact: true,
+      adReferral: { headline: 'Promo de lanzamiento' },
+    });
+    prisma.client.aiAgent.findMany.mockResolvedValue([openAgent()]);
+    prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'Hola' });
+    openAiAdapter.complete.mockResolvedValue({ content: '¡Hola! bienvenido', promptTokens: 10, completionTokens: 5 });
+
+    await service.generateReply('t1', 'conv1', 'msg1');
+
+    const [[callArgs]] = openAiAdapter.complete.mock.calls;
+    const systemMessage = callArgs.messages.find((m: any) => m.role === 'system');
+    expect(systemMessage.content).toContain('contacto nuevo');
+    expect(systemMessage.content).toContain('Promo de lanzamiento');
+  });
+
+  it('does not mention a new contact or an ad when the conversation is from a returning contact', async () => {
+    prisma.client.conversation.findUnique.mockResolvedValue({
+      id: 'conv1',
+      assignedToId: null,
+      status: 'OPEN',
+      channel: 'WHATSAPP',
+      isNewContact: false,
+      adReferral: null,
+    });
+    prisma.client.aiAgent.findMany.mockResolvedValue([openAgent()]);
+    prisma.client.message.findUnique.mockResolvedValue({ id: 'msg1', direction: 'INBOUND', content: 'Hola' });
+    openAiAdapter.complete.mockResolvedValue({ content: '¡Hola de nuevo!', promptTokens: 10, completionTokens: 5 });
+
+    await service.generateReply('t1', 'conv1', 'msg1');
+
+    const [[callArgs]] = openAiAdapter.complete.mock.calls;
+    const systemMessage = callArgs.messages.find((m: any) => m.role === 'system');
+    expect(systemMessage.content).not.toContain('contacto nuevo');
   });
 
   it('skips recording usage and sending a message when the completion content is empty', async () => {

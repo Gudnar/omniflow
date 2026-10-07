@@ -176,6 +176,39 @@ describe('ConversationsService', () => {
       expect(eventEmitter.emit).toHaveBeenCalledWith('message.created', { conversationId: 'conv1', tenantId: 'tenant-1' });
       expect(queueService.enqueueAiReply).toHaveBeenCalledWith('tenant-1', 'conv1', 'msg-first');
     });
+
+    it('still emits message.created but skips enqueuing the AI reply when skipAiReply is true', async () => {
+      tx.conversation.create.mockResolvedValue({ id: 'conv1' });
+      tx.conversation.findUnique.mockResolvedValue({ id: 'conv1', tenantId: 'tenant-1' });
+      tx.message.create.mockResolvedValue({ id: 'msg-first' });
+
+      await service.create({
+        contactId: 'ct1',
+        channel: 'WHATSAPP',
+        firstMessageContent: 'Hola',
+        skipAiReply: true,
+      } as any);
+
+      expect(eventEmitter.emit).toHaveBeenCalledWith('message.created', { conversationId: 'conv1', tenantId: 'tenant-1' });
+      expect(queueService.enqueueAiReply).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('setAiPaused', () => {
+    it('throws NotFoundError when the conversation is missing', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue(null);
+      await expect(service.setAiPaused('missing', true)).rejects.toThrow(NotFoundError);
+    });
+
+    it('updates aiPaused', async () => {
+      prisma.client.conversation.findUnique.mockResolvedValue({ id: 'conv1' });
+      prisma.client.conversation.update.mockResolvedValue({ id: 'conv1', aiPaused: false });
+      await service.setAiPaused('conv1', false);
+      expect(prisma.client.conversation.update).toHaveBeenCalledWith({
+        where: { id: 'conv1' },
+        data: { aiPaused: false },
+      });
+    });
   });
 
   describe('updateStatus', () => {

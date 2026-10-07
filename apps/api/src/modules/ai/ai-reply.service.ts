@@ -58,6 +58,7 @@ function buildSystemPrompt(
   agent: { goal: string | null; personality: string | null; language: string },
   contactName?: string,
   knowledgeChunks: string[] = [],
+  leadContext?: { isNewContact: boolean; adHeadline?: string | null },
 ) {
   const lines = [
     `Eres un agente de atención al cliente por chat, respondiendo en nombre de un negocio.`,
@@ -66,6 +67,12 @@ function buildSystemPrompt(
   if (agent.personality) lines.push(`Personalidad: ${agent.personality}.`);
   if (agent.goal) lines.push(`Objetivo: ${agent.goal}.`);
   if (contactName) lines.push(`Estás hablando con: ${contactName}.`);
+  if (leadContext?.isNewContact) {
+    lines.push('Este es un contacto nuevo que te escribe por primera vez — sé proactivo en ofrecerle la tienda o agendar una cita, y guía la conversación hacia cerrar una venta o reserva.');
+    if (leadContext.adHeadline) {
+      lines.push(`Llegó desde un anuncio con el texto "${leadContext.adHeadline}" — puedes referenciarlo naturalmente si ayuda a la conversación.`);
+    }
+  }
   if (knowledgeChunks.length) {
     lines.push(
       'Usa la siguiente información del negocio para responder cuando sea relevante. Si la pregunta no se relaciona con esta información, ignórala y responde con tu conocimiento general:',
@@ -120,8 +127,10 @@ export class AiReplyService {
       where: { id: conversationId },
       include: { contact: { select: { id: true, name: true } } },
     });
-    // A human already owns this conversation, or it's closed — never talk over them.
-    if (!conversation || conversation.assignedToId || conversation.status === 'CLOSED') return;
+    // A human already owns this conversation, it's closed, or the WhatsApp
+    // "returning contact" one-shot CTA flow paused it (MetaWebhookService) —
+    // never talk over any of those.
+    if (!conversation || conversation.assignedToId || conversation.status === 'CLOSED' || conversation.aiPaused) return;
 
     // Exactly one ACTIVE agent must claim this channel (AiAgentsService
     // enforces this invariant at write time) — zero or more-than-one both
@@ -170,7 +179,13 @@ export class AiReplyService {
     const knowledgeChunks = await this.knowledgeSearchService.search(agent.id, triggeringMessage.content);
 
     const chatMessages: LlmMessage[] = [
-      { role: 'system', content: buildSystemPrompt(agent, conversation.contact?.name, knowledgeChunks) },
+      {
+        role: 'system',
+        content: buildSystemPrompt(agent, conversation.contact?.name, knowledgeChunks, {
+          isNewContact: conversation.isNewContact,
+          adHeadline: (conversation.adReferral as any)?.headline,
+        }),
+      },
       ...ordered.map((m: any) => ({
         role: m.direction === 'INBOUND' ? ('user' as const) : ('assistant' as const),
         content: m.content,

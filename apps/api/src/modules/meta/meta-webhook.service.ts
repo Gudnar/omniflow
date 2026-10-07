@@ -7,6 +7,7 @@ import { MessagesService } from '../conversations/messages.service';
 import { TemplatesService } from '../templates/templates.service';
 import { StorageService } from '../storage/storage.service';
 import { FacebookCommentsService } from '../facebook-comments/facebook-comments.service';
+import { ContactCommerceService } from '../commerce/contact-commerce.service';
 import { Channel, MessageType } from '@omniflow/database';
 import { logger } from '@omniflow/utils';
 
@@ -47,6 +48,7 @@ export class MetaWebhookService {
     private templatesService: TemplatesService,
     private storageService: StorageService,
     private facebookCommentsService: FacebookCommentsService,
+    private contactCommerceService: ContactCommerceService,
   ) {}
 
   async handlePayload(body: any): Promise<void> {
@@ -298,7 +300,12 @@ export class MetaWebhookService {
     });
 
     if (!openConversation) {
-      await this.conversationsService.create({
+      // Only WhatsApp gets the one-shot "here are your options" brake — a
+      // returning contact reopening on Instagram/Messenger/TikTok/webchat
+      // still gets the normal, full AI conversation, same as a new contact.
+      const isReturningWhatsAppContact = channel === 'WHATSAPP';
+
+      const conversation = await this.conversationsService.create({
         contactId: contactChannel.contactId,
         channel,
         externalId: msg.externalContactId,
@@ -306,7 +313,15 @@ export class MetaWebhookService {
         firstMessageExternalId: msg.externalMessageId,
         isNewContact: false,
         adReferral: msg.referral,
+        skipAiReply: isReturningWhatsAppContact,
       } as any);
+
+      if (isReturningWhatsAppContact) {
+        const tenantId = this.tenantContext.getTenantId();
+        if (tenantId) {
+          await this.sendReturningContactOptions(tenantId, conversation.id, contactChannel.contactId);
+        }
+      }
       return;
     }
 
@@ -335,6 +350,64 @@ export class MetaWebhookService {
       attachmentFileName: attachment?.fileName,
       attachmentSize: attachment?.size,
     } as any);
+  }
+
+  // The WhatsApp "returning contact" brake: instead of letting the AI agent
+  // have a back-and-forth, send up to 3 deterministic CTA messages (store /
+  // booking / continue-on-web — only whichever actually apply) and pause the
+  // agent on this conversation. Reuses the exact same link builders the
+  // agent's own send_storefront_link tool and the admin's "Enviar enlace
+  // web" button already rely on (ContactCommerceService.generateStorefrontLink,
+  // ConversationsService.generateWebLink) — never invents a URL here.
+  // WhatsApp's cta_url interactive type carries only one link per message
+  // (see whatsapp-outbound-processor.ts), so "one message" becomes "one
+  // message per available option" rather than a single combined message.
+  private async sendReturningContactOptions(tenantId: string, conversationId: string, contactId: string): Promise<void> {
+    const store = await this.prisma.client.ecommerceStore.findUnique({ where: { tenantId } });
+    const storeAvailable = store?.status === 'PUBLISHED';
+    const canBuy = storeAvailable && (store!.operationMode === 'DIRECT_SALE' || store!.operationMode === 'BOTH');
+    const canBook = storeAvailable && (store!.operationMode === 'BOOKING' || store!.operationMode === 'BOTH');
+
+    if (canBuy || canBook) {
+      try {
+        const { url: storeUrl } = await this.contactCommerceService.generateStorefrontLink(contactId);
+        const [path, query] = storeUrl.split('?');
+
+        if (canBuy) {
+          await this.messagesService.create(conversationId, undefined as any, {
+            direction: 'OUTBOUND',
+            type: 'CTA',
+            content: `Puedes ver nuestra tienda aquí:\n\n${storeUrl}`,
+            ctaPayload: { action: 'STORE', url: storeUrl, label: 'Ir a la tienda' },
+          } as any);
+        }
+        if (canBook) {
+          const bookingUrl = `${path}/reservas?${query}`;
+          await this.messagesService.create(conversationId, undefined as any, {
+            direction: 'OUTBOUND',
+            type: 'CTA',
+            content: `Puedes reservar tu cita aquí:\n\n${bookingUrl}`,
+            ctaPayload: { action: 'BOOKING', url: bookingUrl, label: 'Reservar cita' },
+          } as any);
+        }
+      } catch (error) {
+        logger.error('Meta webhook: failed generating storefront link for returning contact', error as Error, { conversationId });
+      }
+    }
+
+    try {
+      const { url: webUrl } = await this.conversationsService.generateWebLink(conversationId);
+      await this.messagesService.create(conversationId, undefined as any, {
+        direction: 'OUTBOUND',
+        type: 'CTA',
+        content: `O seguimos la conversación desde la web:\n\n${webUrl}`,
+        ctaPayload: { action: 'STORE', url: webUrl, label: 'Continuar por chat web' },
+      } as any);
+    } catch (error) {
+      logger.error('Meta webhook: failed generating web link for returning contact', error as Error, { conversationId });
+    }
+
+    await this.prisma.client.conversation.update({ where: { id: conversationId }, data: { aiPaused: true } });
   }
 
   // Meta's Media API is two hops: resolve the media id to a short-lived,

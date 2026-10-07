@@ -631,6 +631,13 @@ model Conversation {
   // else (organic).
   adReferral Json?
 
+  // True only once the one-shot "store/booking/webchat links" message has
+  // been sent to a RETURNING contact who reopened a WhatsApp conversation —
+  // AiReplyService.generateReply() respects this as another no-reply gate
+  // (same tier as assignedToId/status CLOSED). An operator clears it
+  // manually (ConversationsService.setAiPaused) to hand control back to AI.
+  aiPaused Boolean @default(false)
+
   lastMessageAt DateTime?
 
   createdAt DateTime @default(now())

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Star, Info, MoreVertical, Send, Mic, Link2, Copy, ListChecks, X, Plus, Megaphone } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
-import { apiGet, apiPost } from '@/lib/api-client';
+import { apiGet, apiPatch, apiPost } from '@/lib/api-client';
 import { getStaffSocket, joinConversation, leaveConversation, type NewMessagePayload } from '@/lib/socket-client';
 import type { Conversation, Message } from '@/lib/types';
 import { CHANNEL_LABELS } from './mock-data';
@@ -25,6 +25,12 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
   const [sending, setSending] = useState(false);
   const [webLink, setWebLink] = useState<string | null>(null);
   const [generatingLink, setGeneratingLink] = useState(false);
+  // Optimistic local override — conversation itself is a read-only prop, so
+  // a successful "Reactivar IA" call can't update it directly; reset
+  // whenever the selected conversation changes so a stale override never
+  // leaks onto a different thread.
+  const [aiReactivated, setAiReactivated] = useState(false);
+  const [reactivatingAi, setReactivatingAi] = useState(false);
   const [showQuickRepliesModal, setShowQuickRepliesModal] = useState(false);
   const [quickRepliesForm, setQuickRepliesForm] = useState({ message: '', options: ['', ''] });
   const [sendingQuickReplies, setSendingQuickReplies] = useState(false);
@@ -45,6 +51,10 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
       .then(setMessages)
       .catch((err) => console.error('Error fetching messages:', err));
   }, [conversation, tokens]);
+
+  useEffect(() => {
+    setAiReactivated(false);
+  }, [conversation?.id]);
 
   // Socket.IO here only means "a message landed in this conversation" — on
   // that signal we just re-run the same GET above, never trusting a message
@@ -89,6 +99,20 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
   const copyWebLink = () => {
     if (!webLink) return;
     navigator.clipboard.writeText(webLink).then(() => toast.success('Enlace copiado al portapapeles'));
+  };
+
+  const reactivateAi = async () => {
+    if (!conversation) return;
+    setReactivatingAi(true);
+    try {
+      await apiPatch(`/conversations/${conversation.id}/ai-paused`, tokens?.accessToken, { aiPaused: false });
+      setAiReactivated(true);
+      toast.success('La IA volvió a responder en esta conversación');
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo reactivar la IA');
+    } finally {
+      setReactivatingAi(false);
+    }
   };
 
   const send = async () => {
@@ -213,6 +237,21 @@ export function ChatPanel({ conversation }: { conversation: Conversation | null 
           </button>
         </div>
       </div>
+
+      {conversation.aiPaused && !aiReactivated && (
+        <div className="shrink-0 bg-amber-50 border-b border-amber-200 px-5 py-2 flex items-center justify-between gap-3">
+          <p className="text-xs text-amber-800">
+            IA en pausa en esta conversación — ya se envió el mensaje con opciones, no responderá más hasta que la reactives.
+          </p>
+          <button
+            onClick={reactivateAi}
+            disabled={reactivatingAi}
+            className="text-xs font-semibold text-amber-800 underline shrink-0 disabled:opacity-50"
+          >
+            Reactivar IA
+          </button>
+        </div>
+      )}
 
       <Modal open={webLink !== null} onClose={() => setWebLink(null)} title="Enlace para continuar por web">
         <p className="text-sm text-gray-500 mb-3">

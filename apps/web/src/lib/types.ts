@@ -208,6 +208,7 @@ export interface Conversation {
   branch: { id: string; name: string } | null;
   contactChannel?: { id: string; externalId: string } | null;
   isNewContact: boolean;
+  aiPaused: boolean;
   adReferral: {
     sourceUrl?: string;
     sourceType?: string;
