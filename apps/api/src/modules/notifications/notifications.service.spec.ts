@@ -4,6 +4,8 @@ import { NotFoundError } from '@omniflow/utils';
 describe('NotificationsService', () => {
   let service: NotificationsService;
   let prisma: any;
+  let tenantContext: any;
+  let eventEmitter: any;
 
   beforeEach(() => {
     prisma = {
@@ -19,7 +21,9 @@ describe('NotificationsService', () => {
         },
       },
     };
-    service = new NotificationsService(prisma);
+    tenantContext = { getTenantId: jest.fn().mockReturnValue('tenant-1') };
+    eventEmitter = { emit: jest.fn() };
+    service = new NotificationsService(prisma, tenantContext, eventEmitter);
   });
 
   describe('create', () => {
@@ -47,6 +51,23 @@ describe('NotificationsService', () => {
       prisma.client.user.findMany.mockResolvedValue([]);
       await service.create({ type: 'order.pending_approval', title: 'Nuevo pedido' });
       expect(prisma.client.notification.createMany).not.toHaveBeenCalled();
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
+    });
+
+    it('emits notification.created for the current tenant so RealtimeGateway can push it live', async () => {
+      await service.create({ userId: 'u1', type: 'order.confirmed', title: 'Nuevo pedido', body: 'Bs 100', link: '/dashboard/orders' });
+      expect(eventEmitter.emit).toHaveBeenCalledWith('notification.created', {
+        tenantId: 'tenant-1',
+        title: 'Nuevo pedido',
+        body: 'Bs 100',
+        link: '/dashboard/orders',
+      });
+    });
+
+    it('does not emit when there is no tenant in context', async () => {
+      tenantContext.getTenantId.mockReturnValue(undefined);
+      await service.create({ userId: 'u1', type: 'order.confirmed', title: 'Nuevo pedido' });
+      expect(eventEmitter.emit).not.toHaveBeenCalled();
     });
   });
 

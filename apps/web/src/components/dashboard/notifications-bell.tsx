@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { apiGet, apiPost } from '@/lib/api-client';
+import { getStaffSocket } from '@/lib/socket-client';
 import type { Notification } from '@/lib/types';
 
 const POLL_INTERVAL_MS = 30000;
@@ -28,6 +29,8 @@ export function NotificationsBell() {
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const openRef = useRef(open);
+  openRef.current = open;
 
   const refreshUnreadCount = () => {
     if (!tokens) return;
@@ -40,6 +43,26 @@ export function NotificationsBell() {
     refreshUnreadCount();
     const interval = setInterval(refreshUnreadCount, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
+  }, [tokens]);
+
+  // Live push for new notifications (e.g. a storefront order/booking just
+  // confirmed) — see RealtimeGateway's `notification.created` handler. The
+  // 30s poll above stays as a fallback for a dropped/reconnecting socket.
+  useEffect(() => {
+    if (!tokens) return;
+    const socket = getStaffSocket(tokens.accessToken);
+    const onNotification = () => {
+      refreshUnreadCount();
+      if (openRef.current) {
+        apiGet<Notification[]>('/notifications', tokens.accessToken)
+          .then(setItems)
+          .catch((err) => console.error('Error refreshing notifications:', err));
+      }
+    };
+    socket.on('notification:new', onNotification);
+    return () => {
+      socket.off('notification:new', onNotification);
+    };
   }, [tokens]);
 
   useEffect(() => {

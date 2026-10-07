@@ -22,6 +22,8 @@ const TENANT_SELECT = {
   appointmentApprovalMode: true,
   notifyOnOrderPendingApproval: true,
   notifyOnAppointmentPendingApproval: true,
+  notifyOnOrderConfirmed: true,
+  notifyOnAppointmentConfirmed: true,
   sendAppointmentQrCode: true,
   sendAppointmentReceiptImage: true,
   sendOrderQrCode: true,

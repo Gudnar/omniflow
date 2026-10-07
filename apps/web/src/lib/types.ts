@@ -29,6 +29,8 @@ export interface Tenant {
   appointmentApprovalMode: string;
   notifyOnOrderPendingApproval: boolean;
   notifyOnAppointmentPendingApproval: boolean;
+  notifyOnOrderConfirmed: boolean;
+  notifyOnAppointmentConfirmed: boolean;
   sendAppointmentQrCode: boolean;
   sendAppointmentReceiptImage: boolean;
   sendOrderQrCode: boolean;

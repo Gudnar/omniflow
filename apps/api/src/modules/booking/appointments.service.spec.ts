@@ -421,6 +421,60 @@ describe('AppointmentsService', () => {
       expect(eventsService.emit).toHaveBeenCalledWith('appointment.pending_approval', expect.anything(), 'c1');
       expect(notificationsService.create).not.toHaveBeenCalled();
     });
+
+    it('notifies the in-app bell when an appointment confirms automatically and the tenant opted in', async () => {
+      const resource = { id: 'r1', type: 'ROOM', userId: null, branchId: 'b1' };
+      prisma.client.tenant.findUnique.mockResolvedValue({
+        appointmentApprovalMode: 'AUTOMATIC',
+        notifyOnAppointmentConfirmed: true,
+      });
+      prisma.client.bookingService.findMany.mockResolvedValue([{ id: 's1', durationMinutes: 60, price: '50', name: 'Corte' }]);
+      prisma.client.bookingResource.findMany.mockResolvedValue([resource]);
+      prisma.client.bookingResource.findUnique.mockResolvedValue(resource);
+      prisma.client.bookingResourceSchedule.findMany.mockResolvedValue([{ startMinute: 0, endMinute: 1440 }]);
+      prisma.client.appointmentResource.findMany.mockResolvedValue([]);
+      tx.appointment.create.mockResolvedValue({ id: 'a1' });
+      tx.appointment.findUnique.mockResolvedValue({
+        id: 'a1',
+        contactId: 'c1',
+        startAt: '2026-01-05T09:00:00.000Z',
+        subtotal: '50',
+        total: '50',
+        services: [],
+      });
+
+      await service.create({ contactId: 'c1', branchId: 'b1', serviceIds: ['s1'], startAt: '2026-01-05T09:00:00.000Z' } as any);
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'appointment.confirmed', link: '/dashboard/booking' }),
+      );
+    });
+
+    it('does not notify on automatic confirmation when the tenant has not opted in', async () => {
+      const resource = { id: 'r1', type: 'ROOM', userId: null, branchId: 'b1' };
+      prisma.client.tenant.findUnique.mockResolvedValue({
+        appointmentApprovalMode: 'AUTOMATIC',
+        notifyOnAppointmentConfirmed: false,
+      });
+      prisma.client.bookingService.findMany.mockResolvedValue([{ id: 's1', durationMinutes: 60, price: '50', name: 'Corte' }]);
+      prisma.client.bookingResource.findMany.mockResolvedValue([resource]);
+      prisma.client.bookingResource.findUnique.mockResolvedValue(resource);
+      prisma.client.bookingResourceSchedule.findMany.mockResolvedValue([{ startMinute: 0, endMinute: 1440 }]);
+      prisma.client.appointmentResource.findMany.mockResolvedValue([]);
+      tx.appointment.create.mockResolvedValue({ id: 'a1' });
+      tx.appointment.findUnique.mockResolvedValue({
+        id: 'a1',
+        contactId: 'c1',
+        startAt: '2026-01-05T09:00:00.000Z',
+        subtotal: '50',
+        total: '50',
+        services: [],
+      });
+
+      await service.create({ contactId: 'c1', branchId: 'b1', serviceIds: ['s1'], startAt: '2026-01-05T09:00:00.000Z' } as any);
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
   });
 
   describe('createGroup', () => {

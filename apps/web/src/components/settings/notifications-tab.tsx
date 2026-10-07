@@ -22,7 +22,13 @@ export function NotificationsTab() {
       .finally(() => setLoading(false));
   }, [tokens]);
 
-  const toggle = async (field: 'notifyOnOrderPendingApproval' | 'notifyOnAppointmentPendingApproval') => {
+  const toggle = async (
+    field:
+      | 'notifyOnOrderPendingApproval'
+      | 'notifyOnAppointmentPendingApproval'
+      | 'notifyOnOrderConfirmed'
+      | 'notifyOnAppointmentConfirmed',
+  ) => {
     if (!tenant) return;
     const value = !tenant[field];
     setSaving(true);
@@ -89,6 +95,42 @@ export function NotificationsTab() {
                 </p>
                 <p className="text-xs text-gray-500 mt-0.5">
                   Avisa al equipo cuando una cita nace pendiente (modo de aprobación Manual en Reservas y servicios).
+                </p>
+              </div>
+            </label>
+
+            <label className="w-full flex items-start gap-3 p-4 rounded-lg border border-gray-200 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={tenant.notifyOnOrderConfirmed}
+                disabled={saving}
+                onChange={() => toggle('notifyOnOrderConfirmed')}
+              />
+              <div>
+                <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                  <PackageCheck className="w-3.5 h-3.5 text-gray-400" /> Pedido confirmado
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Avisa al equipo de toda venta confirmada automáticamente (modo de aprobación Automático, el más común en el storefront).
+                </p>
+              </div>
+            </label>
+
+            <label className="w-full flex items-start gap-3 p-4 rounded-lg border border-gray-200 cursor-pointer">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={tenant.notifyOnAppointmentConfirmed}
+                disabled={saving}
+                onChange={() => toggle('notifyOnAppointmentConfirmed')}
+              />
+              <div>
+                <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                  <CalendarClock className="w-3.5 h-3.5 text-gray-400" /> Cita confirmada
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Avisa al equipo de toda reserva confirmada automáticamente (modo de aprobación Automático).
                 </p>
               </div>
             </label>

@@ -116,4 +116,12 @@ export class RealtimeGateway implements OnGatewayConnection {
     this.server.to(conversationRoom(payload.conversationId)).emit('message:new', message);
     this.server.to(tenantRoom(payload.tenantId)).emit('message:new', message);
   }
+
+  // Emitted by NotificationsService.create() — every staff member already
+  // sits in their tenant's room (joined in handleConnection above), so this
+  // is the only room that needs it.
+  @OnEvent('notification.created')
+  handleNotificationCreated(payload: { tenantId: string; title: string; body?: string; link?: string }) {
+    this.server.to(tenantRoom(payload.tenantId)).emit('notification:new', payload);
+  }
 }

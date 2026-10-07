@@ -441,6 +441,50 @@ describe('CartsService', () => {
       expect(notificationsService.create).not.toHaveBeenCalled();
     });
 
+    it('notifies the in-app bell when an order confirms automatically and the tenant opted in', async () => {
+      const item = {
+        id: 'ci1', variantId: 'v1', productId: 'p1', unitPrice: 25, discount: 0, subtotal: 50, quantity: 2,
+        product: { id: 'p1', name: 'Camiseta' }, variant: { id: 'v1', sku: 'CAM-M' },
+      };
+      prisma.client.cart.findUnique.mockResolvedValue(decimalCart({ items: [item], subtotal: '50', total: '50' }));
+      prisma.client.branchProduct.findUnique.mockResolvedValue({ price: '25.00', status: 'AVAILABLE', stock: 100, reservedStock: 0 });
+      prisma.client.cartItem.findMany.mockResolvedValue([item]);
+      prisma.client.tenant.findUnique.mockResolvedValue({
+        orderApprovalMode: 'AUTOMATIC',
+        notifyOnOrderConfirmed: true,
+      });
+      tx.branchProduct.findUnique.mockResolvedValue({ id: 'bp1', reservedStock: 0 });
+      tx.order.create.mockResolvedValue({ id: 'order-1' });
+      tx.order.findUnique.mockResolvedValue({ id: 'order-1', contactId: 'c1', orderNumber: 'ORD-1', items: [], subtotal: '50', discount: '0', shipping: '0', tax: '0', total: '50' });
+
+      await service.checkout('cart-1', { fulfillmentType: 'PICKUP' } as any);
+
+      expect(notificationsService.create).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'order.confirmed', link: '/dashboard/orders' }),
+      );
+    });
+
+    it('does not notify on automatic confirmation when the tenant has not opted in', async () => {
+      const item = {
+        id: 'ci1', variantId: 'v1', productId: 'p1', unitPrice: 25, discount: 0, subtotal: 50, quantity: 2,
+        product: { id: 'p1', name: 'Camiseta' }, variant: { id: 'v1', sku: 'CAM-M' },
+      };
+      prisma.client.cart.findUnique.mockResolvedValue(decimalCart({ items: [item], subtotal: '50', total: '50' }));
+      prisma.client.branchProduct.findUnique.mockResolvedValue({ price: '25.00', status: 'AVAILABLE', stock: 100, reservedStock: 0 });
+      prisma.client.cartItem.findMany.mockResolvedValue([item]);
+      prisma.client.tenant.findUnique.mockResolvedValue({
+        orderApprovalMode: 'AUTOMATIC',
+        notifyOnOrderConfirmed: false,
+      });
+      tx.branchProduct.findUnique.mockResolvedValue({ id: 'bp1', reservedStock: 0 });
+      tx.order.create.mockResolvedValue({ id: 'order-1' });
+      tx.order.findUnique.mockResolvedValue({ id: 'order-1', contactId: 'c1', orderNumber: 'ORD-1', items: [], subtotal: '50', discount: '0', shipping: '0', tax: '0', total: '50' });
+
+      await service.checkout('cart-1', { fulfillmentType: 'PICKUP' } as any);
+
+      expect(notificationsService.create).not.toHaveBeenCalled();
+    });
+
     it('snapshots the session\'s captured GPS location onto the order when the cart is linked to one', async () => {
       const item = {
         id: 'ci1', variantId: 'v1', productId: 'p1', unitPrice: 25, discount: 0, subtotal: 50, quantity: 2,

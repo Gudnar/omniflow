@@ -104,4 +104,19 @@ describe('RealtimeGateway', () => {
       expect(emitFn).toHaveBeenCalledWith('message:new', { conversationId: 'conv1' });
     });
   });
+
+  describe('handleNotificationCreated', () => {
+    it('emits notification:new to the tenant-wide room only', () => {
+      const emitFn = jest.fn();
+      const toSpy = jest.fn().mockReturnValue({ emit: emitFn });
+      gateway.server = { to: toSpy } as any;
+
+      const payload = { tenantId: 't1', title: 'Nuevo pedido confirmado', body: 'Bs 100', link: '/dashboard/orders' };
+      gateway.handleNotificationCreated(payload);
+
+      expect(toSpy).toHaveBeenCalledWith('tenant:t1');
+      expect(toSpy).toHaveBeenCalledTimes(1);
+      expect(emitFn).toHaveBeenCalledWith('notification:new', payload);
+    });
+  });
 });

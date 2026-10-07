@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { PrismaService } from '../prisma/prisma.service';
+import { TenantContextService } from '../tenant-context/tenant-context.service';
 import { NotFoundError } from '@omniflow/utils';
 
 export interface CreateNotificationInput {
@@ -13,7 +15,11 @@ export interface CreateNotificationInput {
 
 @Injectable()
 export class NotificationsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private tenantContext: TenantContextService,
+    private eventEmitter: EventEmitter2,
+  ) {}
 
   async create(dto: CreateNotificationInput) {
     const targetUserIds = dto.userId
@@ -33,6 +39,19 @@ export class NotificationsService {
         link: dto.link,
       })),
     });
+
+    // Lets RealtimeGateway push this to every connected staff member in the
+    // tenant immediately — see its `notification.created` handler — instead
+    // of everyone waiting on the bell's 30s poll.
+    const tenantId = this.tenantContext.getTenantId();
+    if (tenantId) {
+      this.eventEmitter.emit('notification.created', {
+        tenantId,
+        title: dto.title,
+        body: dto.body,
+        link: dto.link,
+      });
+    }
   }
 
   async list(userId: string, opts: { unreadOnly?: boolean } = {}) {

@@ -383,6 +383,13 @@ export class CartsService {
           link: '/dashboard/orders',
         });
       }
+    } else if (tenant?.notifyOnOrderConfirmed) {
+      await this.notificationsService.create({
+        type: 'order.confirmed',
+        title: `Nuevo pedido confirmado: ${order.orderNumber}`,
+        body: `${order.currency} ${Number(order.total).toFixed(2)}`,
+        link: '/dashboard/orders',
+      });
     }
 
     return serializeOrder(order);

@@ -414,6 +414,13 @@ export class AppointmentsService {
           link: '/dashboard/booking',
         });
       }
+    } else if (tenant?.notifyOnAppointmentConfirmed) {
+      await this.notificationsService.create({
+        type: 'appointment.confirmed',
+        title: 'Nueva cita confirmada',
+        body: new Date(appointment.startAt).toLocaleString('es-BO', { timeZone, dateStyle: 'medium', timeStyle: 'short' }),
+        link: '/dashboard/booking',
+      });
     }
 
     return serializeAppointment(appointment);

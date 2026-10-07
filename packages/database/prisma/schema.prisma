@@ -69,6 +69,13 @@ model Tenant {
   notifyOnOrderPendingApproval Boolean @default(true)
   notifyOnAppointmentPendingApproval Boolean @default(true)
 
+  // Same idea, for the common AUTOMATIC-mode case: the order/appointment is
+  // confirmed immediately (no approval step at all), which otherwise never
+  // touched Notification — most tenants selling directly off the storefront
+  // run in this mode, so without this they'd never see a sale/booking alert.
+  notifyOnOrderConfirmed Boolean @default(true)
+  notifyOnAppointmentConfirmed Boolean @default(true)
+
   // Automatic post-confirmation "ticket" images sent into the originating
   // conversation (ConfirmationImagesService) — a QR code encoding a plain-text
   // summary, and/or a rendered receipt image. Independently toggleable per
