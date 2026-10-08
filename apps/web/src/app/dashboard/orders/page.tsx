@@ -8,6 +8,7 @@ import type { Order } from '@/lib/types';
 import { OrdersTable } from '@/components/orders/orders-table';
 import { OrderDetailPanel } from '@/components/orders/order-detail-panel';
 import { DeliveryRoutesTab } from '@/components/orders/delivery-routes-tab';
+import { Modal } from '@/components/ui/modal';
 
 const TABS = ['Todos', 'Ventas', 'Reservas', 'Pendientes', 'Preparación', 'Entrega', 'Rutas del día', 'Historial'] as const;
 type Tab = (typeof TABS)[number];
@@ -86,15 +87,14 @@ export default function OrdersPage() {
       {tab === 'Rutas del día' && <DeliveryRoutesTab />}
 
       {tab !== 'Reservas' && tab !== 'Rutas del día' && (
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-4 items-start">
-          <OrdersTable orders={filtered} selectedId={selectedId} onSelect={setSelectedId} />
-          {selectedId && (
-            <div className="sticky top-6">
-              <OrderDetailPanel orderId={selectedId} onClose={() => setSelectedId(null)} onChanged={refetch} />
-            </div>
-          )}
-        </div>
+        <OrdersTable orders={filtered} selectedId={selectedId} onSelect={setSelectedId} />
       )}
+
+      <Modal open={!!selectedId} onClose={() => setSelectedId(null)} size="lg">
+        {selectedId && (
+          <OrderDetailPanel orderId={selectedId} onClose={() => setSelectedId(null)} onChanged={refetch} />
+        )}
+      </Modal>
     </div>
   );
 }
