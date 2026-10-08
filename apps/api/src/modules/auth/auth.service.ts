@@ -135,6 +135,7 @@ export class AuthService {
       include: {
         tenant: true,
         roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+        branches: { select: { branchId: true } },
       },
     });
 
@@ -165,6 +166,7 @@ export class AuthService {
       user.email,
       user.tenantId,
       user.roles as any,
+      user.branches as any,
     );
 
     const hasAdminRole = (user.roles as any[]).some((ur: any) => ur.role.isSystem);
@@ -188,6 +190,7 @@ export class AuthService {
         user: {
           include: {
             roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+            branches: { select: { branchId: true } },
           },
         },
       },
@@ -211,6 +214,7 @@ export class AuthService {
       tokenRecord.user.email,
       tokenRecord.user.tenantId,
       tokenRecord.user.roles,
+      (tokenRecord.user as any).branches,
     );
 
     // generateTokens() above already persisted a RefreshToken row for
@@ -347,6 +351,7 @@ export class AuthService {
       where: { id: payload.sub },
       include: {
         roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } },
+        branches: { select: { branchId: true } },
       },
     });
 
@@ -383,6 +388,7 @@ export class AuthService {
       user.email,
       user.tenantId,
       user.roles,
+      (user as any).branches,
     );
   }
 
@@ -391,10 +397,13 @@ export class AuthService {
     email: string,
     tenantId: string,
     userRoles?: any[],
+    userBranches?: { branchId: string }[],
   ): Promise<AuthTokens> {
     const roles = userRoles?.map((ur: any) => ur.role.name) || [];
     const permissions = userRoles
       ?.flatMap((ur: any) => ur.role.permissions.map((rp: any) => rp.permission.code)) || [];
+    // Empty = unrestricted (every branch) — see UserBranch in the schema.
+    const branchIds = userBranches?.map((ub) => ub.branchId) || [];
 
     const payload: JwtPayload = {
       sub: userId,
@@ -402,6 +411,7 @@ export class AuthService {
       email,
       roles,
       permissions,
+      branchIds,
     };
 
     const accessToken = this.jwtService.sign(payload, {

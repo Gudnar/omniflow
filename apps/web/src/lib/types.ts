@@ -960,3 +960,28 @@ export interface AnalyticsOverview {
   salesByBranch: { branchId: string; branchName: string; total: number }[];
   recentActivity: { id: string; type: string; subject: string; description: string | null; contactName: string; occurredAt: string }[];
 }
+
+export interface Permission {
+  id: string;
+  code: string;
+  description: string | null;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  isSystem: boolean;
+  permissions: { permission: Permission; scope: string }[];
+}
+
+export interface StaffUser {
+  id: string;
+  email: string;
+  status: 'ACTIVE' | 'INVITED' | 'DISABLED';
+  mfaEnabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+  roles: { id: string; name: string }[];
+  // Empty = unrestricted (manages every branch).
+  branches: { id: string; name: string }[];
+}

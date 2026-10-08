@@ -31,4 +31,7 @@ export interface JwtPayload {
   email: string;
   roles: string[];
   permissions: string[];
+  // Empty = unrestricted (manages every branch). One or more ids = scoped to
+  // exactly those branches — see UserBranch in the Prisma schema.
+  branchIds: string[];
 }

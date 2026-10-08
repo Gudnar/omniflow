@@ -58,6 +58,28 @@ describe('OrdersService', () => {
       const result = await service.findOne('o1');
       expect(result.total).toBe(50);
     });
+
+    it('returns the order when its branch is in the caller\'s allowed set', async () => {
+      prisma.client.order.findUnique.mockResolvedValue(order({ branchId: 'b1' }));
+      const result = await service.findOne('o1', ['b1', 'b2']);
+      expect(result.id).toBe('o1');
+    });
+
+    it('throws NotFoundError (not Forbidden) for an order outside the caller\'s branches — never reveals it exists', async () => {
+      prisma.client.order.findUnique.mockResolvedValue(order({ branchId: 'other-branch' }));
+      await expect(service.findOne('o1', ['b1'])).rejects.toThrow(NotFoundError);
+    });
+
+    it('throws NotFoundError for a branchless order when the caller is branch-restricted', async () => {
+      prisma.client.order.findUnique.mockResolvedValue(order({ branchId: null }));
+      await expect(service.findOne('o1', ['b1'])).rejects.toThrow(NotFoundError);
+    });
+
+    it('is unrestricted when branchIds is empty', async () => {
+      prisma.client.order.findUnique.mockResolvedValue(order({ branchId: 'any-branch' }));
+      const result = await service.findOne('o1');
+      expect(result.id).toBe('o1');
+    });
   });
 
   describe('listForContact', () => {
@@ -84,6 +106,26 @@ describe('OrdersService', () => {
       prisma.client.order.findMany.mockResolvedValue([]);
       await service.list({} as any);
       expect(prisma.client.order.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: {} }));
+    });
+
+    it('restricts to the caller\'s branches when branchIds is non-empty and no specific branch was requested', async () => {
+      prisma.client.order.findMany.mockResolvedValue([]);
+      await service.list({} as any, ['b1', 'b2']);
+      expect(prisma.client.order.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { branchId: { in: ['b1', 'b2'] } } }),
+      );
+    });
+
+    it('allows a specific branchId query when it is one of the caller\'s allowed branches', async () => {
+      prisma.client.order.findMany.mockResolvedValue([]);
+      await service.list({ branchId: 'b1' } as any, ['b1', 'b2']);
+      expect(prisma.client.order.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { branchId: 'b1' } }));
+    });
+
+    it('returns nothing — never queries — for a branchId outside the caller\'s allowed branches', async () => {
+      const result = await service.list({ branchId: 'other-branch' } as any, ['b1']);
+      expect(result).toEqual([]);
+      expect(prisma.client.order.findMany).not.toHaveBeenCalled();
     });
   });
 

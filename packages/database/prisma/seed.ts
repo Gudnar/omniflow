@@ -28,7 +28,10 @@ async function main() {
     { code: 'commerce.read', description: 'Read commerce sessions, carts, and customer addresses' },
     { code: 'commerce.manage', description: 'Create/update commerce sessions, carts, cart items, and checkout' },
     { code: 'orders.read', description: 'Read orders' },
-    { code: 'orders.manage', description: 'Manage orders (reserved for Phase 11 order management)' },
+    { code: 'orders.manage', description: 'Full order management — confirm/cancel/fulfill/set any status (superset of the specific permissions below)' },
+    { code: 'orders.approve', description: 'Confirm a PENDING order' },
+    { code: 'orders.cancel', description: 'Cancel an order' },
+    { code: 'orders.fulfill', description: 'Update fulfillment details, tracking code, and resend the receipt' },
     { code: 'booking.read', description: 'Read booking services, resources, schedules, and staff time-off' },
     { code: 'booking.manage', description: 'Manage booking services, resources, schedules, and staff time-off' },
     { code: 'appointments.read', description: 'Read appointments and availability' },
@@ -59,6 +62,40 @@ async function main() {
   }
 
   console.log('✓ Permissions seeded successfully');
+
+  // Backfill: RolesService.seedDefaultRolesForTenant() only ever runs once,
+  // at tenant registration — a tenant created before a permission existed
+  // (like the orders.approve/cancel/fulfill split above) never gets it
+  // granted to its OWNER/ADMIN roles without this. Safe to re-run: every
+  // write here is an upsert, and it naturally stays a no-op once a tenant's
+  // roles are already in sync with the full catalog.
+  const allPermissions = await prisma.permission.findMany();
+  const tenants = await prisma.tenant.findMany({ select: { id: true } });
+  for (const tenant of tenants) {
+    const [ownerRole, adminRole] = await Promise.all([
+      prisma.role.findUnique({ where: { tenantId_name: { tenantId: tenant.id, name: 'OWNER' } } }),
+      prisma.role.findUnique({ where: { tenantId_name: { tenantId: tenant.id, name: 'ADMIN' } } }),
+    ]);
+
+    for (const permission of allPermissions) {
+      if (ownerRole) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: ownerRole.id, permissionId: permission.id } },
+          update: {},
+          create: { roleId: ownerRole.id, permissionId: permission.id, scope: 'TENANT' },
+        });
+      }
+      if (adminRole && !permission.code.startsWith('tenant.') && !permission.code.startsWith('roles.')) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: adminRole.id, permissionId: permission.id } },
+          update: {},
+          create: { roleId: adminRole.id, permissionId: permission.id, scope: 'TENANT' },
+        });
+      }
+    }
+  }
+
+  console.log(`✓ Backfilled new permissions onto ${tenants.length} existing tenant(s)' OWNER/ADMIN roles`);
 
   // Global AI provider/model catalog (Phase 13: AI foundation) — shared
   // across every tenant, same "seed once, never tenant-scoped" treatment as

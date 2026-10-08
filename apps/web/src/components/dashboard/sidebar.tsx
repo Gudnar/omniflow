@@ -27,6 +27,7 @@ import {
   ChevronDown,
   MoreVertical,
   Link2,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface NavItem {
@@ -65,7 +66,10 @@ const navGroups: NavItem[][] = [
     { label: 'Reportes', href: '#', icon: BarChart3 },
     { label: 'Analytics', href: '#', icon: LineChart },
   ],
-  [{ label: 'Configuración', href: '/dashboard/settings', icon: Settings }],
+  [
+    { label: 'Usuarios', href: '/dashboard/users', icon: ShieldCheck },
+    { label: 'Configuración', href: '/dashboard/settings', icon: Settings },
+  ],
 ];
 
 export function Sidebar({ className = 'hidden lg:flex' }: { className?: string }) {

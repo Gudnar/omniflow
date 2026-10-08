@@ -105,11 +105,22 @@ export class OrdersService {
     private messagesService: MessagesService,
   ) {}
 
-  async list(query: ListOrdersQueryDto) {
+  // branchIds: the ACTING user's allowed branches (from their JWT, see
+  // UserBranch) — empty means unrestricted. Never trust query.branchId
+  // alone for a restricted user: if they ask for a branch outside their
+  // own set, the honest answer is "nothing", not that branch's orders.
+  async list(query: ListOrdersQueryDto, branchIds: string[] = []) {
+    if (branchIds.length && query.branchId && !branchIds.includes(query.branchId)) {
+      return [];
+    }
     const orders = await this.prisma.client.order.findMany({
       where: {
         ...(query.status && { status: query.status }),
-        ...(query.branchId && { branchId: query.branchId }),
+        ...(query.branchId
+          ? { branchId: query.branchId }
+          : branchIds.length
+            ? { branchId: { in: branchIds } }
+            : {}),
       },
       include: ORDER_INCLUDE,
       orderBy: { createdAt: 'desc' },
@@ -117,9 +128,18 @@ export class OrdersService {
     return orders.map(serializeOrder);
   }
 
-  async findOne(id: string) {
+  // Same branchIds contract as list() above — every mutation below
+  // (confirm/cancel/setStatus/updateFulfillment/updateTrackingCode/
+  // sendReceipt) routes through here first, so this one check covers all of
+  // them: a branch-restricted user can't act on an order outside their
+  // branches just by knowing its id. A branchless order (branchId null)
+  // never matches a restriction — fails closed rather than guessing.
+  async findOne(id: string, branchIds: string[] = []) {
     const order = await this.prisma.client.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
     if (!order) throw new NotFoundError('Order');
+    if (branchIds.length && (!order.branchId || !branchIds.includes(order.branchId))) {
+      throw new NotFoundError('Order');
+    }
     return serializeOrder(order);
   }
 
@@ -132,32 +152,32 @@ export class OrdersService {
     return orders.map(serializeOrder);
   }
 
-  async listStatusHistory(orderId: string) {
-    await this.findOne(orderId);
+  async listStatusHistory(orderId: string, branchIds: string[] = []) {
+    await this.findOne(orderId, branchIds);
     return this.prisma.client.orderStatusHistory.findMany({
       where: { orderId },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async confirm(id: string, actorUserId: string, note?: string) {
-    const order = await this.findOne(id);
+  async confirm(id: string, actorUserId: string, note?: string, branchIds: string[] = []) {
+    const order = await this.findOne(id, branchIds);
     if (order.status !== 'PENDING') {
       throw new ValidationError('Only a PENDING order can be confirmed');
     }
-    return this.transition(id, 'CONFIRMED', actorUserId, note);
+    return this.transition(id, 'CONFIRMED', actorUserId, note, undefined, branchIds);
   }
 
-  async cancel(id: string, actorUserId: string, dto: CancelOrderDto) {
-    return this.transition(id, 'CANCELLED', actorUserId, dto.note);
+  async cancel(id: string, actorUserId: string, dto: CancelOrderDto, branchIds: string[] = []) {
+    return this.transition(id, 'CANCELLED', actorUserId, dto.note, undefined, branchIds);
   }
 
-  async setStatus(id: string, actorUserId: string, dto: UpdateOrderStatusDto) {
-    return this.transition(id, dto.status, actorUserId, dto.note, dto.receivedByName);
+  async setStatus(id: string, actorUserId: string, dto: UpdateOrderStatusDto, branchIds: string[] = []) {
+    return this.transition(id, dto.status, actorUserId, dto.note, dto.receivedByName, branchIds);
   }
 
-  async updateFulfillment(id: string, dto: UpdateOrderFulfillmentDto) {
-    const order = await this.findOne(id);
+  async updateFulfillment(id: string, dto: UpdateOrderFulfillmentDto, branchIds: string[] = []) {
+    const order = await this.findOne(id, branchIds);
     if (order.status === 'DELIVERED' || order.status === 'CANCELLED') {
       throw new ValidationError('Cannot change fulfillment on a completed/cancelled order');
     }
@@ -185,8 +205,8 @@ export class OrdersService {
   // Free-text "comanda"/guía de envío — purely operational labeling, no
   // validation of format since an in-house ticket and a courier's own
   // waybill number look nothing alike.
-  async updateTrackingCode(id: string, dto: UpdateOrderTrackingCodeDto) {
-    await this.findOne(id);
+  async updateTrackingCode(id: string, dto: UpdateOrderTrackingCodeDto, branchIds: string[] = []) {
+    await this.findOne(id, branchIds);
     await this.prisma.client.order.update({ where: { id }, data: { trackingCode: dto.trackingCode } });
     return this.findOne(id);
   }
@@ -220,8 +240,8 @@ export class OrdersService {
   // (Order.cartId → Cart.commerceSessionId → CommerceSession.conversationId)
   // — channel-agnostic: whichever conversation (WhatsApp, webchat, etc.) the
   // customer was in when they checked out, so this isn't webchat-only.
-  async sendReceipt(id: string, actorUserId: string) {
-    const order = await this.findOne(id);
+  async sendReceipt(id: string, actorUserId: string, branchIds: string[] = []) {
+    const order = await this.findOne(id, branchIds);
 
     const cart = await this.prisma.client.cart.findUnique({
       where: { id: order.cartId },
@@ -251,8 +271,9 @@ export class OrdersService {
     actorUserId: string | undefined,
     note: string | undefined,
     receivedByName?: string,
+    branchIds: string[] = [],
   ) {
-    const order = await this.findOne(id);
+    const order = await this.findOne(id, branchIds);
     const allowed = TRANSITIONS[order.status] ?? [];
     if (!allowed.includes(toStatus)) {
       throw new ValidationError(`Cannot transition an order from ${order.status} to ${toStatus}`);

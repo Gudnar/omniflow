@@ -18,67 +18,71 @@ export class OrdersController {
   @UseGuards(JwtAuthGuard)
   @RequirePermission('orders.read')
   @HttpCode(200)
-  list(@Query() query: ListOrdersQueryDto) {
-    return this.ordersService.list(query);
+  list(@Request() req: any, @Query() query: ListOrdersQueryDto) {
+    return this.ordersService.list(query, req.user.branchIds);
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard)
   @RequirePermission('orders.read')
   @HttpCode(200)
-  findOne(@Param('id') id: string) {
-    return this.ordersService.findOne(id);
+  findOne(@Request() req: any, @Param('id') id: string) {
+    return this.ordersService.findOne(id, req.user.branchIds);
   }
 
   @Get(':id/status-history')
   @UseGuards(JwtAuthGuard)
   @RequirePermission('orders.read')
   @HttpCode(200)
-  listStatusHistory(@Param('id') id: string) {
-    return this.ordersService.listStatusHistory(id);
+  listStatusHistory(@Request() req: any, @Param('id') id: string) {
+    return this.ordersService.listStatusHistory(id, req.user.branchIds);
   }
 
   @Post(':id/confirm')
   @UseGuards(JwtAuthGuard)
-  @RequirePermission('orders.manage')
+  @RequirePermission('orders.approve')
   confirm(@Request() req: any, @Param('id') id: string, @Body() dto: CancelOrderDto) {
-    return this.ordersService.confirm(id, req.user.userId, dto.note);
+    return this.ordersService.confirm(id, req.user.userId, dto.note, req.user.branchIds);
   }
 
   @Post(':id/cancel')
   @UseGuards(JwtAuthGuard)
-  @RequirePermission('orders.manage')
+  @RequirePermission('orders.cancel')
   cancel(@Request() req: any, @Param('id') id: string, @Body() dto: CancelOrderDto) {
-    return this.ordersService.cancel(id, req.user.userId, dto);
+    return this.ordersService.cancel(id, req.user.userId, dto, req.user.branchIds);
   }
 
+  // The generic "set any status" door stays behind the full orders.manage
+  // permission on purpose — it can also move an order to CONFIRMED/CANCELLED,
+  // so gating it behind the narrower approve/cancel permissions would let
+  // someone with only one of those bypass the other through this endpoint.
   @Post(':id/status')
   @UseGuards(JwtAuthGuard)
   @RequirePermission('orders.manage')
   setStatus(@Request() req: any, @Param('id') id: string, @Body() dto: UpdateOrderStatusDto) {
-    return this.ordersService.setStatus(id, req.user.userId, dto);
+    return this.ordersService.setStatus(id, req.user.userId, dto, req.user.branchIds);
   }
 
   @Post(':id/fulfillment')
   @UseGuards(JwtAuthGuard)
-  @RequirePermission('orders.manage')
-  updateFulfillment(@Param('id') id: string, @Body() dto: UpdateOrderFulfillmentDto) {
-    return this.ordersService.updateFulfillment(id, dto);
+  @RequirePermission('orders.fulfill')
+  updateFulfillment(@Request() req: any, @Param('id') id: string, @Body() dto: UpdateOrderFulfillmentDto) {
+    return this.ordersService.updateFulfillment(id, dto, req.user.branchIds);
   }
 
   @Post(':id/send-receipt')
   @UseGuards(JwtAuthGuard)
-  @RequirePermission('orders.manage')
+  @RequirePermission('orders.fulfill')
   @HttpCode(200)
   sendReceipt(@Request() req: any, @Param('id') id: string) {
-    return this.ordersService.sendReceipt(id, req.user.userId);
+    return this.ordersService.sendReceipt(id, req.user.userId, req.user.branchIds);
   }
 
   @Patch(':id/tracking-code')
   @UseGuards(JwtAuthGuard)
-  @RequirePermission('orders.manage')
+  @RequirePermission('orders.fulfill')
   @HttpCode(200)
-  updateTrackingCode(@Param('id') id: string, @Body() dto: UpdateOrderTrackingCodeDto) {
-    return this.ordersService.updateTrackingCode(id, dto);
+  updateTrackingCode(@Request() req: any, @Param('id') id: string, @Body() dto: UpdateOrderTrackingCodeDto) {
+    return this.ordersService.updateTrackingCode(id, dto, req.user.branchIds);
   }
 }
