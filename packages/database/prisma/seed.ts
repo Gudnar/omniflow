@@ -32,6 +32,8 @@ async function main() {
     { code: 'orders.approve', description: 'Confirm a PENDING order' },
     { code: 'orders.cancel', description: 'Cancel an order' },
     { code: 'orders.fulfill', description: 'Update fulfillment details, tracking code, and resend the receipt' },
+    { code: 'delivery.read', description: 'Read drivers, vehicles, delivery zones/rates, and delivery provider configuration' },
+    { code: 'delivery.manage', description: 'Manage drivers, vehicles, delivery zones/rates, and delivery provider configuration' },
     { code: 'booking.read', description: 'Read booking services, resources, schedules, and staff time-off' },
     { code: 'booking.manage', description: 'Manage booking services, resources, schedules, and staff time-off' },
     { code: 'appointments.read', description: 'Read appointments and availability' },

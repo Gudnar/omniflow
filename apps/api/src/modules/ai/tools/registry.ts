@@ -154,6 +154,39 @@ export const ECOMMERCE_TOOLS: ToolDefinition[] = [
     riskLevel: 'read',
     parameters: { type: 'object', properties: {} },
   },
+  // check_delivery_coverage/get_delivery_quote (Fase 20, AI_SPEC.md) comparten
+  // el mismo handler (deliveryQuote) — mismo patrón que create_checkout/
+  // create_order. get_delivery_status/request_delivery_location/
+  // request_human_delivery_assistance NO se agregan todavía: dependen de
+  // tracking en vivo (no construido) o ya los cubre request_location — un
+  // tool sin nada real para consultar es peor que no tenerlo.
+  {
+    name: 'check_delivery_coverage',
+    description:
+      'Verifica si la sucursal hace entregas a domicilio en la zona/dirección del cliente. Usala antes de ofrecer delivery si no estás seguro de que la zona esté cubierta.',
+    riskLevel: 'read',
+    parameters: {
+      type: 'object',
+      properties: {
+        zoneLabel: { type: 'string', description: 'Nombre/barrio de la zona que mencionó el cliente (opcional).' },
+        latitude: { type: 'number', description: 'Latitud si el cliente compartió su ubicación (opcional).' },
+        longitude: { type: 'number', description: 'Longitud si el cliente compartió su ubicación (opcional).' },
+      },
+    },
+  },
+  {
+    name: 'get_delivery_quote',
+    description: 'Consulta el costo de entrega a domicilio para la zona/dirección del cliente.',
+    riskLevel: 'read',
+    parameters: {
+      type: 'object',
+      properties: {
+        zoneLabel: { type: 'string', description: 'Nombre/barrio de la zona que mencionó el cliente (opcional).' },
+        latitude: { type: 'number', description: 'Latitud si el cliente compartió su ubicación (opcional).' },
+        longitude: { type: 'number', description: 'Longitud si el cliente compartió su ubicación (opcional).' },
+      },
+    },
+  },
 ];
 
 export const BOOKING_TOOLS: ToolDefinition[] = [

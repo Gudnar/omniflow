@@ -4,6 +4,7 @@ import { ConversationsModule } from '../conversations/conversations.module';
 import { KnowledgeModule } from '../knowledge/knowledge.module';
 import { CommerceModule } from '../commerce/commerce.module';
 import { BookingModule } from '../booking/booking.module';
+import { DeliveryZonesModule } from '../delivery/delivery-zones.module';
 import { AiCatalogController } from './ai-catalog.controller';
 import { AiCatalogService } from './ai-catalog.service';
 import { AiAgentsController } from './ai-agents.controller';
@@ -23,7 +24,7 @@ import { InternalApiKeyGuard } from '../internal-actions/internal-api-key.guard'
 import { AiToolsService } from './tools/ai-tools.service';
 
 @Module({
-  imports: [PrismaModule, ConversationsModule, KnowledgeModule, CommerceModule, BookingModule],
+  imports: [PrismaModule, ConversationsModule, KnowledgeModule, CommerceModule, BookingModule, DeliveryZonesModule],
   controllers: [AiCatalogController, AiAgentsController, AiUsageController, InternalAiActionsController],
   providers: [
     AiCatalogService,

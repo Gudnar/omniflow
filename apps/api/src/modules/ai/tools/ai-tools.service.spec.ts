@@ -9,6 +9,7 @@ describe('AiToolsService', () => {
   let ordersService: any;
   let appointmentsService: any;
   let bookingServicesService: any;
+  let deliveryZonesService: any;
 
   const ctx = { tenantId: 't1', contactId: 'c1', conversationId: 'conv1', agentId: 'agent1' };
   const session = { id: 'sess1', contactId: 'c1', conversationId: 'conv1', branchId: 'b1' };
@@ -29,7 +30,16 @@ describe('AiToolsService', () => {
     ordersService = { listForContact: jest.fn(), cancel: jest.fn() };
     appointmentsService = { create: jest.fn(), reschedule: jest.fn(), cancel: jest.fn(), findOne: jest.fn(), getAvailability: jest.fn() };
     bookingServicesService = { list: jest.fn() };
-    service = new AiToolsService(prisma, cartsService, commerceSessionsService, ordersService, appointmentsService, bookingServicesService);
+    deliveryZonesService = { calculateFee: jest.fn() };
+    service = new AiToolsService(
+      prisma,
+      cartsService,
+      commerceSessionsService,
+      ordersService,
+      appointmentsService,
+      bookingServicesService,
+      deliveryZonesService,
+    );
   });
 
   describe('execute dispatch', () => {

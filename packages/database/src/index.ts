@@ -56,6 +56,14 @@ export {
   CampaignRecipientStatus,
 } from './prisma';
 export { FulfillmentStatus } from './prisma';
+export { DeliveryRouteStatus, DeliveryRouteStopStatus } from './prisma';
+export {
+  DeliveryProviderType,
+  DeliveryOperationMode,
+  DriverStatus,
+  VehicleType,
+  DeliveryZoneMatchType,
+} from './prisma';
 export { AiProviderType, AiModelStatus, AiAgentStatus } from './prisma';
 export { KnowledgeDocumentStatus } from './prisma';
 export { LinkPageStatus } from './prisma';

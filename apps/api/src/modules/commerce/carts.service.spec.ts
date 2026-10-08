@@ -26,6 +26,9 @@ describe('CartsService', () => {
   let tenantContext: any;
   let notificationsService: any;
   let confirmationImagesService: any;
+  let deliveryZonesService: any;
+  let deliveryProviderConfigService: any;
+  let queueService: any;
 
   beforeEach(() => {
     tx = {
@@ -46,6 +49,7 @@ describe('CartsService', () => {
             .mockResolvedValue({ orderApprovalMode: 'AUTOMATIC', notifyOnOrderPendingApproval: true }),
         },
         commerceSession: { findUnique: jest.fn().mockResolvedValue(null) },
+        customerAddress: { findUnique: jest.fn().mockResolvedValue(null) },
         $transaction: jest.fn((cb: any) => cb(tx)),
       },
     };
@@ -53,7 +57,19 @@ describe('CartsService', () => {
     tenantContext = { getTenantId: jest.fn().mockReturnValue('t1') };
     notificationsService = { create: jest.fn() };
     confirmationImagesService = { send: jest.fn() };
-    service = new CartsService(prisma, eventsService, tenantContext, notificationsService, confirmationImagesService);
+    deliveryZonesService = { calculateFee: jest.fn().mockResolvedValue({ covered: true, fee: 0 }) };
+    deliveryProviderConfigService = { resolveForBranch: jest.fn().mockResolvedValue(null) };
+    queueService = { enqueueDeliveryNotifyForOrder: jest.fn() };
+    service = new CartsService(
+      prisma,
+      eventsService,
+      tenantContext,
+      notificationsService,
+      confirmationImagesService,
+      deliveryZonesService,
+      deliveryProviderConfigService,
+      queueService,
+    );
   });
 
   describe('findOne', () => {
@@ -196,6 +212,59 @@ describe('CartsService', () => {
       ).rejects.toThrow(ValidationError);
     });
 
+    it('rejects LOCAL_DELIVERY checkout when the address is out of zone coverage', async () => {
+      const item = { id: 'ci1', variantId: 'v1', unitPrice: 25, discount: 0, quantity: 1 };
+      prisma.client.cart.findUnique.mockResolvedValue(decimalCart({ items: [item] }));
+      prisma.client.branchProduct.findUnique.mockResolvedValue({
+        price: '25.00',
+        status: 'AVAILABLE',
+        stock: 100,
+        reservedStock: 0,
+      });
+      prisma.client.cartItem.findMany.mockResolvedValue([item]);
+      deliveryZonesService.calculateFee.mockResolvedValue({ covered: false });
+
+      await expect(
+        service.checkout('cart-1', { fulfillmentType: 'LOCAL_DELIVERY', addressId: 'addr-1' } as any),
+      ).rejects.toThrow(ValidationError);
+      expect(prisma.client.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('uses the recalculated zone fee as shipping (and in the order total), never the stale cart value', async () => {
+      const item = {
+        id: 'ci1',
+        variantId: 'v1',
+        productId: 'p1',
+        unitPrice: 25,
+        discount: 0,
+        subtotal: 25,
+        quantity: 1,
+        product: { id: 'p1', name: 'Camiseta' },
+        variant: { id: 'v1', sku: 'CAM-M' },
+      };
+      prisma.client.cart.findUnique.mockResolvedValue(
+        decimalCart({ items: [item], subtotal: '25', shipping: '0', total: '25' }),
+      );
+      prisma.client.branchProduct.findUnique.mockResolvedValue({
+        price: '25.00',
+        status: 'AVAILABLE',
+        stock: 100,
+        reservedStock: 0,
+      });
+      prisma.client.cartItem.findMany.mockResolvedValue([item]);
+      prisma.client.customerAddress.findUnique.mockResolvedValue({ zone: 'centro', latitude: null, longitude: null });
+      deliveryZonesService.calculateFee.mockResolvedValue({ covered: true, fee: 15 });
+      tx.branchProduct.findUnique.mockResolvedValue({ id: 'bp1', reservedStock: 0 });
+      tx.order.create.mockResolvedValue({ id: 'order-1' });
+      tx.order.findUnique.mockResolvedValue({ id: 'order-1', items: [] });
+
+      await service.checkout('cart-1', { fulfillmentType: 'LOCAL_DELIVERY', addressId: 'addr-1' } as any);
+
+      expect(tx.order.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ shipping: 15, total: 40 }) }),
+      );
+    });
+
     it('throws and creates nothing when validation finds a blocking issue', async () => {
       const item = { id: 'ci1', variantId: 'v1', unitPrice: 25, discount: 0, quantity: 10 };
       prisma.client.cart.findUnique.mockResolvedValue(decimalCart({ items: [item] }));
@@ -248,6 +317,7 @@ describe('CartsService', () => {
 
       const result = await service.checkout('cart-1', { fulfillmentType: 'PICKUP' } as any);
 
+      expect(deliveryProviderConfigService.resolveForBranch).not.toHaveBeenCalled();
       expect(tx.branchProduct.update).toHaveBeenCalledWith({ where: { id: 'bp1' }, data: { reservedStock: 2 } });
       expect(tx.order.create).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -281,6 +351,54 @@ describe('CartsService', () => {
         { orderId: 'order-1', orderNumber: 'ORD-1', total: 50, productIds: [], productNames: [] },
         'c1',
       );
+    });
+
+    it('enqueues a Telegram notify on auto-confirm checkout when the branch is LOCAL_DELIVERY + TELEGRAM_NOTIFY + IMMEDIATE', async () => {
+      const item = {
+        id: 'ci1', variantId: 'v1', productId: 'p1', unitPrice: 25, discount: 0, subtotal: 50, quantity: 2,
+        product: { id: 'p1', name: 'Camiseta' }, variant: { id: 'v1', sku: 'CAM-M' },
+      };
+      prisma.client.cart.findUnique.mockResolvedValue(decimalCart({ items: [item], subtotal: '50', total: '50' }));
+      prisma.client.branchProduct.findUnique.mockResolvedValue({
+        price: '25.00', status: 'AVAILABLE', stock: 100, reservedStock: 0,
+      });
+      prisma.client.cartItem.findMany.mockResolvedValue([item]);
+      tx.branchProduct.findUnique.mockResolvedValue({ id: 'bp1', reservedStock: 0 });
+      tx.order.create.mockResolvedValue({ id: 'order-1' });
+      tx.order.findUnique.mockResolvedValue({
+        id: 'order-1', contactId: 'c1', orderNumber: 'ORD-1', branchId: 'b1', fulfillmentType: 'LOCAL_DELIVERY',
+        items: [], subtotal: '50', discount: '0', shipping: '0', tax: '0', total: '50',
+      });
+      deliveryProviderConfigService.resolveForBranch.mockResolvedValue({ type: 'TELEGRAM_NOTIFY', operationMode: 'IMMEDIATE' });
+
+      await service.checkout('cart-1', { fulfillmentType: 'LOCAL_DELIVERY', addressId: 'addr-1' } as any);
+
+      expect(deliveryProviderConfigService.resolveForBranch).toHaveBeenCalledWith('t1', 'b1');
+      expect(queueService.enqueueDeliveryNotifyForOrder).toHaveBeenCalledWith('t1', 'order-1');
+    });
+
+    it('does not enqueue anything when the order requires manual approval, even if the branch is IMMEDIATE', async () => {
+      const item = {
+        id: 'ci1', variantId: 'v1', productId: 'p1', unitPrice: 25, discount: 0, subtotal: 50, quantity: 2,
+        product: { id: 'p1', name: 'Camiseta' }, variant: { id: 'v1', sku: 'CAM-M' },
+      };
+      prisma.client.tenant.findUnique.mockResolvedValue({ orderApprovalMode: 'MANUAL' });
+      prisma.client.cart.findUnique.mockResolvedValue(decimalCart({ items: [item], subtotal: '50', total: '50' }));
+      prisma.client.branchProduct.findUnique.mockResolvedValue({
+        price: '25.00', status: 'AVAILABLE', stock: 100, reservedStock: 0,
+      });
+      prisma.client.cartItem.findMany.mockResolvedValue([item]);
+      tx.branchProduct.findUnique.mockResolvedValue({ id: 'bp1', reservedStock: 0 });
+      tx.order.create.mockResolvedValue({ id: 'order-1' });
+      tx.order.findUnique.mockResolvedValue({
+        id: 'order-1', contactId: 'c1', orderNumber: 'ORD-1', branchId: 'b1', fulfillmentType: 'LOCAL_DELIVERY',
+        items: [], subtotal: '50', discount: '0', shipping: '0', tax: '0', total: '50',
+      });
+      deliveryProviderConfigService.resolveForBranch.mockResolvedValue({ type: 'TELEGRAM_NOTIFY', operationMode: 'IMMEDIATE' });
+
+      await service.checkout('cart-1', { fulfillmentType: 'LOCAL_DELIVERY', addressId: 'addr-1' } as any);
+
+      expect(queueService.enqueueDeliveryNotifyForOrder).not.toHaveBeenCalled();
     });
 
     it('sends confirmation images when the cart has a commerceSessionId with a conversation and the tenant has them enabled', async () => {

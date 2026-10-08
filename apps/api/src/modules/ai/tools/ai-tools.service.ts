@@ -6,6 +6,7 @@ import { CommerceSessionsService } from '../../commerce/commerce-sessions.servic
 import { OrdersService } from '../../commerce/orders.service';
 import { AppointmentsService } from '../../booking/appointments.service';
 import { BookingServicesService } from '../../booking/booking-services.service';
+import { DeliveryZonesService } from '../../delivery/delivery-zones.service';
 import { ToolContext, ToolExecutionResult } from './types';
 import { getToolDefinition } from './registry';
 
@@ -24,6 +25,7 @@ export class AiToolsService {
     private ordersService: OrdersService,
     private appointmentsService: AppointmentsService,
     private bookingServicesService: BookingServicesService,
+    private deliveryZonesService: DeliveryZonesService,
   ) {}
 
   async execute(name: string, argsJson: string, ctx: ToolContext): Promise<ToolExecutionResult> {
@@ -206,6 +208,34 @@ export class AiToolsService {
 
   private async tool_request_location() {
     return { instruction: 'Pídele al cliente su dirección de entrega (o sugiérele el enlace de la tienda para compartir su ubicación real desde el navegador).' };
+  }
+
+  // Fase 20 — check_delivery_coverage/get_delivery_quote comparten este
+  // handler (mismo patrón que checkout() más arriba para create_checkout/
+  // create_order): misma consulta, dos nombres según la intención del agente.
+  private async deliveryQuote(
+    args: { zoneLabel?: string; latitude?: number; longitude?: number },
+    ctx: ToolContext,
+  ) {
+    const branchId = await this.resolveBranchId(ctx);
+    const cart = await this.resolveCart(ctx);
+    const result = await this.deliveryZonesService.calculateFee(
+      branchId,
+      { zone: args.zoneLabel, latitude: args.latitude, longitude: args.longitude },
+      Number(cart.subtotal),
+    );
+    if (!result.covered) {
+      return { covered: false };
+    }
+    return { covered: true, fee: result.fee, currency: cart.currency };
+  }
+
+  private tool_check_delivery_coverage(args: { zoneLabel?: string; latitude?: number; longitude?: number }, ctx: ToolContext) {
+    return this.deliveryQuote(args, ctx);
+  }
+
+  private tool_get_delivery_quote(args: { zoneLabel?: string; latitude?: number; longitude?: number }, ctx: ToolContext) {
+    return this.deliveryQuote(args, ctx);
   }
 
   // ---- Booking tools --------------------------------------------------------

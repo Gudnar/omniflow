@@ -47,6 +47,10 @@ export class QueueService implements OnModuleDestroy {
   // rather than overloading channelOutboundQueue's job shape.
   private facebookCommentsOutboundQueue = new Queue('facebook-comments-outbound', { connection: this.connection });
 
+  // Fase 20: notificar una parada de entrega por Telegram — nunca se llama a
+  // la Bot API en el request síncrono de agregar la parada.
+  private deliveryNotifyQueue = new Queue('delivery-notify', { connection: this.connection });
+
   async enqueueChannelOutboundMessage(channel: Channel, messageId: string): Promise<void> {
     await this.channelOutboundQueue.add(
       'send-message',
@@ -136,6 +140,36 @@ export class QueueService implements OnModuleDestroy {
     );
   }
 
+  async enqueueDeliveryNotify(tenantId: string, stopId: string): Promise<void> {
+    await this.deliveryNotifyQueue.add(
+      'notify',
+      { tenantId, stopId },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: true,
+        removeOnFail: 1000,
+      },
+    );
+  }
+
+  // Entrega individual (sin ruta) — una sucursal en modo IMMEDIATE avisa al
+  // confirmarse el pedido, no al agregarlo a una ruta (que no existe en
+  // este flujo). Misma cola, distinta forma de job: el worker busca por
+  // orderId en vez de por stopId.
+  async enqueueDeliveryNotifyForOrder(tenantId: string, orderId: string): Promise<void> {
+    await this.deliveryNotifyQueue.add(
+      'notify',
+      { tenantId, orderId },
+      {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        removeOnComplete: true,
+        removeOnFail: 1000,
+      },
+    );
+  }
+
   async enqueueFacebookCommentReply(tenantId: string, commentId: string, parentExternalId: string): Promise<void> {
     await this.facebookCommentsOutboundQueue.add(
       'reply',
@@ -156,6 +190,7 @@ export class QueueService implements OnModuleDestroy {
     await this.aiRepliesQueue.close();
     await this.transcriptionsQueue.close();
     await this.facebookCommentsOutboundQueue.close();
+    await this.deliveryNotifyQueue.close();
     await this.connection.quit();
   }
 }

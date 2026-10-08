@@ -33,21 +33,21 @@ enum PermissionScope {
 }
 
 model Tenant {
-  id String @id @default(cuid())
-  name String
-  slug String @unique
+  id     String       @id @default(cuid())
+  name   String
+  slug   String       @unique
   status TenantStatus @default(ACTIVE)
 
-  taxId String?
-  description String?
-  logo String?
-  timezone String @default("America/La_Paz")
-  language String @default("es")
-  currency String @default("BOB")
-  dateFormat String @default("DD/MM/YYYY")
-  timeFormat String @default("24h")
-  decimalSeparator String @default(",")
-  thousandsSeparator String @default(".")
+  taxId              String?
+  description        String?
+  logo               String?
+  timezone           String  @default("America/La_Paz")
+  language           String  @default("es")
+  currency           String  @default("BOB")
+  dateFormat         String  @default("DD/MM/YYYY")
+  timeFormat         String  @default("24h")
+  decimalSeparator   String  @default(",")
+  thousandsSeparator String  @default(".")
 
   // 'AUTOMATIC' (default, today's only behavior — CartsService.checkout()
   // confirms every order immediately) | 'MANUAL' (order is created PENDING;
@@ -66,14 +66,14 @@ model Tenant {
   // moments CartsService.checkout()/AppointmentsService.create() already
   // create — separate from the generic NOTIFY workflow action below, which
   // covers arbitrary operator-defined automations.
-  notifyOnOrderPendingApproval Boolean @default(true)
+  notifyOnOrderPendingApproval       Boolean @default(true)
   notifyOnAppointmentPendingApproval Boolean @default(true)
 
   // Same idea, for the common AUTOMATIC-mode case: the order/appointment is
   // confirmed immediately (no approval step at all), which otherwise never
   // touched Notification — most tenants selling directly off the storefront
   // run in this mode, so without this they'd never see a sale/booking alert.
-  notifyOnOrderConfirmed Boolean @default(true)
+  notifyOnOrderConfirmed       Boolean @default(true)
   notifyOnAppointmentConfirmed Boolean @default(true)
 
   // Hours since the customer's last message that WhatsApp still counts as a
@@ -89,136 +89,144 @@ model Tenant {
   // summary, and/or a rendered receipt image. Independently toggleable per
   // flow (booking vs order) and per image type, since a tenant may want one
   // without the other.
-  sendAppointmentQrCode Boolean @default(true)
+  sendAppointmentQrCode       Boolean @default(true)
   sendAppointmentReceiptImage Boolean @default(true)
-  sendOrderQrCode Boolean @default(true)
-  sendOrderReceiptImage Boolean @default(true)
+  sendOrderQrCode             Boolean @default(true)
+  sendOrderReceiptImage       Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users User[]
-  roles Role[]
-  refreshTokens RefreshToken[]
-  branches Branch[]
-  userBranches UserBranch[]
-  contacts Contact[]
-  companies Company[]
-  tags Tag[]
-  contactTags ContactTag[]
-  notes Note[]
-  activities Activity[]
-  contactChannels ContactChannel[]
-  conversations Conversation[]
-  messages Message[]
-  attachments Attachment[]
-  metaConnections MetaConnection[]
-  metaAppCredential TenantMetaAppCredential?
-  tikTokConnection TikTokConnection?
-  aiCredentials TenantAiCredential[]
-  ecommerceStore EcommerceStore?
-  ecommerceStoreSettings EcommerceStoreSettings[]
-  ecommerceSections EcommerceSection[]
-  ecommerceStoreBranches EcommerceStoreBranch[]
-  categories Category[]
-  products Product[]
-  productVariants ProductVariant[]
-  productMedia ProductMedia[]
-  branchProducts BranchProduct[]
-  inventoryMovements InventoryMovement[]
-  inventoryTransfers InventoryTransfer[]
-  inventoryTransferItems InventoryTransferItem[]
-  customerAddresses CustomerAddress[]
-  commerceSessions CommerceSession[]
-  carts Cart[]
-  cartItems CartItem[]
-  orders Order[]
-  orderItems OrderItem[]
-  orderStatusHistory OrderStatusHistory[]
-  bookingServices BookingService[]
-  bookingServiceUsers BookingServiceUser[]
-  bookingResources BookingResource[]
-  bookingResourceServices BookingResourceService[]
-  bookingResourceSchedules BookingResourceSchedule[]
-  userSchedules UserSchedule[]
-  userScheduleIntervals UserScheduleInterval[]
-  userTimeOffs UserTimeOff[]
-  bookingBlackoutDates BookingBlackoutDate[]
-  appointments Appointment[]
-  appointmentServices AppointmentService[]
-  appointmentResources AppointmentResource[]
-  appointmentStatusHistory AppointmentStatusHistory[]
-  paymentMethods PaymentMethod[]
-  notifications Notification[]
-  events Event[]
-  flows Flow[]
-  flowNodes FlowNode[]
-  flowEdges FlowEdge[]
-  flowExecutions FlowExecution[]
-  flowExecutionLogs FlowExecutionLog[]
-  messageTemplates MessageTemplate[]
-  segments Segment[]
-  campaigns Campaign[]
-  campaignRecipients CampaignRecipient[]
-  fulfillments Fulfillment[]
-  aiAgents AiAgent[]
-  aiUsage AiUsage[]
-  knowledgeDocuments KnowledgeDocument[]
-  knowledgeChunks KnowledgeChunk[]
+  users                     User[]
+  roles                     Role[]
+  refreshTokens             RefreshToken[]
+  branches                  Branch[]
+  userBranches              UserBranch[]
+  contacts                  Contact[]
+  companies                 Company[]
+  tags                      Tag[]
+  contactTags               ContactTag[]
+  notes                     Note[]
+  activities                Activity[]
+  contactChannels           ContactChannel[]
+  conversations             Conversation[]
+  messages                  Message[]
+  attachments               Attachment[]
+  metaConnections           MetaConnection[]
+  metaAppCredential         TenantMetaAppCredential?
+  tikTokConnection          TikTokConnection?
+  aiCredentials             TenantAiCredential[]
+  ecommerceStore            EcommerceStore?
+  ecommerceStoreSettings    EcommerceStoreSettings[]
+  ecommerceSections         EcommerceSection[]
+  ecommerceStoreBranches    EcommerceStoreBranch[]
+  categories                Category[]
+  products                  Product[]
+  productVariants           ProductVariant[]
+  productMedia              ProductMedia[]
+  branchProducts            BranchProduct[]
+  inventoryMovements        InventoryMovement[]
+  inventoryTransfers        InventoryTransfer[]
+  inventoryTransferItems    InventoryTransferItem[]
+  customerAddresses         CustomerAddress[]
+  commerceSessions          CommerceSession[]
+  carts                     Cart[]
+  cartItems                 CartItem[]
+  orders                    Order[]
+  orderItems                OrderItem[]
+  orderStatusHistory        OrderStatusHistory[]
+  bookingServices           BookingService[]
+  bookingServiceUsers       BookingServiceUser[]
+  bookingResources          BookingResource[]
+  bookingResourceServices   BookingResourceService[]
+  bookingResourceSchedules  BookingResourceSchedule[]
+  userSchedules             UserSchedule[]
+  userScheduleIntervals     UserScheduleInterval[]
+  userTimeOffs              UserTimeOff[]
+  bookingBlackoutDates      BookingBlackoutDate[]
+  appointments              Appointment[]
+  appointmentServices       AppointmentService[]
+  appointmentResources      AppointmentResource[]
+  appointmentStatusHistory  AppointmentStatusHistory[]
+  paymentMethods            PaymentMethod[]
+  notifications             Notification[]
+  events                    Event[]
+  flows                     Flow[]
+  flowNodes                 FlowNode[]
+  flowEdges                 FlowEdge[]
+  flowExecutions            FlowExecution[]
+  flowExecutionLogs         FlowExecutionLog[]
+  messageTemplates          MessageTemplate[]
+  segments                  Segment[]
+  campaigns                 Campaign[]
+  campaignRecipients        CampaignRecipient[]
+  fulfillments              Fulfillment[]
+  deliveryRoutes            DeliveryRoute[]
+  deliveryProviderConfigs   DeliveryProviderConfig[]
+  drivers                   Driver[]
+  vehicles                  Vehicle[]
+  deliveryAssignments       DeliveryAssignment[]
+  deliveryZones             DeliveryZone[]
+  aiAgents                  AiAgent[]
+  aiUsage                   AiUsage[]
+  knowledgeDocuments        KnowledgeDocument[]
+  knowledgeChunks           KnowledgeChunk[]
   aiAgentKnowledgeDocuments AiAgentKnowledgeDocument[]
-  posts Post[]
-  comments Comment[]
-  linkPage LinkPage?
-  linkPageItems LinkPageItem[]
+  posts                     Post[]
+  comments                  Comment[]
+  linkPage                  LinkPage?
+  linkPageItems             LinkPageItem[]
 
   @@index([status])
 }
 
 model User {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  email String @unique
+  email        String     @unique
   passwordHash String
-  status UserStatus @default(ACTIVE)
+  status       UserStatus @default(ACTIVE)
 
   mfaEnabled Boolean @default(false)
-  mfaSecret String?
+  mfaSecret  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  roles UserRole[]
-  refreshTokens RefreshToken[]
-  mfaRecoveryCodes MfaRecoveryCode[]
-  branches UserBranch[]
+  roles               UserRole[]
+  refreshTokens       RefreshToken[]
+  mfaRecoveryCodes    MfaRecoveryCode[]
+  branches            UserBranch[]
+  deliveryRoutes      DeliveryRoute[]
+  deliveryAssignments DeliveryAssignment[]
 
   @@index([tenantId, status])
   @@index([email])
 }
 
 model Role {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
+  name     String
   isSystem Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   permissions RolePermission[]
-  users UserRole[]
+  users       UserRole[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
 }
 
 model Permission {
-  id String @id @default(cuid())
-  code String @unique
+  id          String  @id @default(cuid())
+  code        String  @unique
   description String?
 
   createdAt DateTime @default(now())
@@ -229,10 +237,10 @@ model Permission {
 
 model RolePermission {
   roleId String
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   permissionId String
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   scope PermissionScope @default(TENANT)
 
@@ -242,26 +250,26 @@ model RolePermission {
 
 model UserRole {
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   roleId String
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@id([userId, roleId])
   @@index([roleId])
 }
 
 model RefreshToken {
-  id String @id @default(cuid())
+  id     String @id @default(cuid())
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  tokenHash String @unique
-  expiresAt DateTime
-  revokedAt DateTime?
+  tokenHash         String    @unique
+  expiresAt         DateTime
+  revokedAt         DateTime?
   replacedByTokenId String?
 
   userAgent String?
@@ -274,12 +282,12 @@ model RefreshToken {
 }
 
 model MfaRecoveryCode {
-  id String @id @default(cuid())
+  id     String @id @default(cuid())
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   codeHash String
-  usedAt DateTime?
+  usedAt   DateTime?
 
   createdAt DateTime @default(now())
 
@@ -294,43 +302,48 @@ enum BranchStatus {
 }
 
 model Branch {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
-  slug String
-  status BranchStatus @default(ACTIVE)
-  address String?
+  name               String
+  slug               String
+  status             BranchStatus @default(ACTIVE)
+  address            String?
   // Optional — only set when an admin configures them. Lets the storefront
   // route a customer to the nearest branch by browser geolocation
   // (StorefrontService/CommerceSessionsService.setNearestBranch); a store
   // with fewer than 2 branches carrying both fields never triggers that
   // flow (SECURITY.md: only request location when actually configured/used).
-  latitude Float?
-  longitude Float?
-  timezone String @default("UTC")
+  latitude           Float?
+  longitude          Float?
+  timezone           String       @default("UTC")
   // Minimum advance notice, in days, required for a PUBLIC booking-storefront
   // reservation (see BookingStorefrontService) — not enforced for
   // operator-created appointments, who may still book same-day walk-ins.
-  minBookingLeadDays Int @default(1)
+  minBookingLeadDays Int          @default(1)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users UserBranch[]
-  conversations Conversation[]
-  ecommerceStores EcommerceStoreBranch[]
-  branchProducts BranchProduct[]
-  outgoingTransfers InventoryTransfer[] @relation("TransferFromBranch")
-  incomingTransfers InventoryTransfer[] @relation("TransferToBranch")
-  commerceSessions CommerceSession[]
-  carts Cart[]
-  orders Order[]
-  bookingResources BookingResource[]
-  appointments Appointment[]
-  fulfillments Fulfillment[]
-  bookingBlackoutDates BookingBlackoutDate[]
+  users                   UserBranch[]
+  conversations           Conversation[]
+  ecommerceStores         EcommerceStoreBranch[]
+  branchProducts          BranchProduct[]
+  outgoingTransfers       InventoryTransfer[]      @relation("TransferFromBranch")
+  incomingTransfers       InventoryTransfer[]      @relation("TransferToBranch")
+  commerceSessions        CommerceSession[]
+  carts                   Cart[]
+  orders                  Order[]
+  bookingResources        BookingResource[]
+  appointments            Appointment[]
+  fulfillments            Fulfillment[]
+  deliveryRoutes          DeliveryRoute[]
+  deliveryProviderConfigs DeliveryProviderConfig[]
+  drivers                 Driver[]
+  vehicles                Vehicle[]
+  deliveryZones           DeliveryZone[]
+  bookingBlackoutDates    BookingBlackoutDate[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, status])
@@ -338,13 +351,13 @@ model Branch {
 
 model UserBranch {
   userId String
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   branchId String
-  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -388,16 +401,16 @@ enum ActivityType {
 }
 
 model Company {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
+  name     String
   industry String?
-  website String?
-  phone String?
-  email String?
-  address String?
+  website  String?
+  phone    String?
+  email    String?
+  address  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -408,19 +421,19 @@ model Company {
 }
 
 model Contact {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
-  email String?
-  phone String?
-  type ContactType @default(LEAD)
-  status ContactStatus @default(ACTIVE)
+  name   String
+  email  String?
+  phone  String?
+  type   ContactType    @default(LEAD)
+  status ContactStatus  @default(ACTIVE)
   source ContactSource?
 
   companyId String?
-  company Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  company   Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 
   // Plain scalar, not a formal relation to User (avoids touching the User model;
   // no DB-level FK integrity on owner assignment in this phase).
@@ -429,16 +442,16 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tags ContactTag[]
-  notes Note[]
-  activities Activity[]
-  channels ContactChannel[]
-  conversations Conversation[]
-  addresses CustomerAddress[]
+  tags             ContactTag[]
+  notes            Note[]
+  activities       Activity[]
+  channels         ContactChannel[]
+  conversations    Conversation[]
+  addresses        CustomerAddress[]
   commerceSessions CommerceSession[]
-  carts Cart[]
-  orders Order[]
-  appointments Appointment[]
+  carts            Cart[]
+  orders           Order[]
+  appointments     Appointment[]
 
   @@index([tenantId, status])
   @@index([tenantId, type])
@@ -446,11 +459,11 @@ model Contact {
 }
 
 model Tag {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
+  name  String
   color String?
 
   createdAt DateTime @default(now())
@@ -463,13 +476,13 @@ model Tag {
 
 model ContactTag {
   contactId String
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   tagId String
-  tag Tag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  tag   Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
@@ -479,16 +492,16 @@ model ContactTag {
 }
 
 model Note {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   contactId String
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   // Plain scalar, not a formal relation to User (same rationale as Contact.ownerId).
   authorId String
-  body String
+  body     String
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -498,18 +511,18 @@ model Note {
 }
 
 model Activity {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   contactId String
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
-  ownerId String?
-  type ActivityType
-  subject String
+  ownerId     String?
+  type        ActivityType
+  subject     String
   description String?
-  occurredAt DateTime @default(now())
+  occurredAt  DateTime     @default(now())
 
   createdAt DateTime @default(now())
 
@@ -565,14 +578,14 @@ enum MessageType {
 }
 
 model ContactChannel {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   contactId String
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
-  channel Channel
+  channel    Channel
   externalId String
 
   createdAt DateTime @default(now())
@@ -586,21 +599,21 @@ model ContactChannel {
 }
 
 model Conversation {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   contactId String
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   contactChannelId String?
-  contactChannel ContactChannel? @relation(fields: [contactChannelId], references: [id], onDelete: SetNull)
+  contactChannel   ContactChannel? @relation(fields: [contactChannelId], references: [id], onDelete: SetNull)
 
   channel Channel
-  status ConversationStatus @default(OPEN)
+  status  ConversationStatus @default(OPEN)
 
   branchId String?
-  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   // Plain scalar, not a formal relation to User (same rationale as Contact.ownerId).
   assignedToId String?
@@ -657,9 +670,9 @@ model Conversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  messages Message[]
+  messages         Message[]
   commerceSessions CommerceSession[]
-  carts Cart[]
+  carts            Cart[]
 
   @@index([tenantId, status])
   @@index([tenantId, lastMessageAt])
@@ -668,16 +681,16 @@ model Conversation {
 }
 
 model Message {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   conversationId String
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
   direction MessageDirection
-  type MessageType @default(TEXT)
-  content String
+  type      MessageType      @default(TEXT)
+  content   String
 
   // Meta's message id (messages[].id from the WhatsApp webhook payload).
   // Nullable because manually-created messages via POST /conversations/:id/messages
@@ -691,7 +704,7 @@ model Message {
 
   // Phase 17: Campaigns/templates. Plain scalar (same rationale as senderId
   // above) tracing a TEMPLATE message back to the campaign that sent it.
-  campaignId String?
+  campaignId      String?
   // Snapshot of the exact Graph API `template` object ({name, language,
   // components}) resolved at send time — set only when type is TEMPLATE, so
   // apps/worker's outbound processor never has to re-resolve variables
@@ -721,17 +734,17 @@ model Message {
 }
 
 model Attachment {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   messageId String
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
-  url String
+  url      String
   mimeType String
   fileName String
-  size Int
+  size     Int
 
   createdAt DateTime @default(now())
 
@@ -750,7 +763,7 @@ model MetaConnection {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Only WHATSAPP, INSTAGRAM, MESSENGER, or FACEBOOK are ever written here
   // (enforced in application code, not at the DB level). FACEBOOK is a
@@ -784,8 +797,8 @@ model MetaConnection {
   // WhatsApp's displayPhoneNumber, Instagram's username, or the Page's name.
   displayName String
 
-  status MetaConnectionStatus @default(CONNECTED)
-  connectedAt DateTime @default(now())
+  status      MetaConnectionStatus @default(CONNECTED)
+  connectedAt DateTime             @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -803,11 +816,11 @@ model MetaConnection {
 // /webhooks/meta/c/:webhookPathId route); sending still uses the per-
 // channel MetaConnection.accessToken above, unaffected by this.
 model TenantMetaAppCredential {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String @unique
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  appId String
+  appId              String
   // AES-256-GCM via packages/utils/crypto.ts — this is the one credential in
   // this feature set that, if leaked, lets someone forge webhook payloads
   // claiming to be Meta, so it does NOT get the "plaintext, documented debt"
@@ -820,7 +833,7 @@ model TenantMetaAppCredential {
   // Opaque id forming this tenant's unique webhook URL segment — never the
   // raw tenantId, to avoid exposing/enumerating it in a URL pasted into a
   // third party's (the tenant's own) Meta App dashboard.
-  webhookPathId String @unique
+  webhookPathId      String @unique
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -836,13 +849,13 @@ model Post {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   externalId String // Meta's post_id
   // Best-effort, fetched once via Graph API when the post is first seen
   // (i.e. when its first comment arrives) — never re-fetched/refreshed.
-  message String?
-  permalink String?
+  message    String?
+  permalink  String?
 
   comments Comment[]
 
@@ -857,10 +870,10 @@ model Comment {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   postId String
-  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
 
   // Meta's comment_id. Null for an OUTBOUND row between the moment we create
   // it (so the operator sees it immediately) and the worker's send job
@@ -870,13 +883,13 @@ model Comment {
   externalId String? @unique
 
   parentId String?
-  parent Comment? @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
-  replies Comment[] @relation("CommentReplies")
+  parent   Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: SetNull)
+  replies  Comment[] @relation("CommentReplies")
 
-  direction MessageDirection // reuses the same INBOUND/OUTBOUND enum as Message
+  direction        MessageDirection // reuses the same INBOUND/OUTBOUND enum as Message
   authorExternalId String? // null for OUTBOUND (it's us, the Page)
-  authorName String? // null for OUTBOUND
-  message String
+  authorName       String? // null for OUTBOUND
+  message          String
 
   createdAt DateTime @default(now())
 
@@ -894,7 +907,7 @@ model TikTokConnection {
   id String @id @default(cuid())
 
   tenantId String @unique
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // TikTok's business/advertiser account id from the OAuth exchange. Named
   // businessId rather than openId (TikTok's consumer Login-Kit concept, a
@@ -902,15 +915,15 @@ model TikTokConnection {
   // response once the user has TikTok developer access.
   businessId String @unique
 
-  clientKey String
-  accessToken String
+  clientKey    String
+  accessToken  String
   // TikTok OAuth tokens expire and require a refresh_token grant. Stored
   // here, but actual refresh-on-expiry logic is an explicit out-of-scope gap
   // for this phase — Meta's long-lived tokens don't need this, TikTok's do.
   refreshToken String
 
-  status TikTokConnectionStatus @default(CONNECTED)
-  connectedAt DateTime @default(now())
+  status      TikTokConnectionStatus @default(CONNECTED)
+  connectedAt DateTime               @default(now())
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -958,24 +971,24 @@ model EcommerceStore {
   id String @id @default(cuid())
 
   tenantId String @unique
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
+  name               String
   // Globally unique — backs the public storefront route (/tienda/:slug).
   // Previously had no uniqueness constraint at all (admin-only usage never
   // needed it); safe to add now (tenantId is itself @unique, so today's
   // dev data can only ever have one row).
-  slug String @unique
-  status EcommerceStoreStatus @default(DRAFT)
-  operationMode EcommerceOperationMode @default(DIRECT_SALE)
-  locationSource EcommerceLocationSource @default(WHATSAPP)
-  fulfillmentOptions FulfillmentType[] @default([PICKUP])
-  publishedAt DateTime?
+  slug               String                  @unique
+  status             EcommerceStoreStatus    @default(DRAFT)
+  operationMode      EcommerceOperationMode  @default(DIRECT_SALE)
+  locationSource     EcommerceLocationSource @default(WHATSAPP)
+  fulfillmentOptions FulfillmentType[]       @default([PICKUP])
+  publishedAt        DateTime?
   // Opt-in AI shopping assistant widget on the public storefront — same
   // WEBCHAT channel/Socket.IO infra as the Página de Enlaces widget (see
   // LinkPage.chatEnabled), just a separate toggle since a tenant may want it
   // on one surface and not the other.
-  chatEnabled Boolean @default(false)
+  chatEnabled        Boolean                 @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -989,23 +1002,23 @@ model EcommerceStoreSettings {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  storeId String @unique
-  store EcommerceStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  storeId String         @unique
+  store   EcommerceStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
-  logo String?
-  mobileLogo String?
-  favicon String?
-  heroImage String?
+  logo            String?
+  mobileLogo      String?
+  favicon         String?
+  heroImage       String?
   mobileHeroImage String?
-  primaryColor String @default("#2563eb")
-  secondaryColor String @default("#1e293b")
-  buttonColor String @default("#2563eb")
-  textColor String @default("#111827")
-  backgroundColor String @default("#ffffff")
-  promoColor String @default("#dc2626")
-  fontFamily String @default("Inter")
+  primaryColor    String  @default("#2563eb")
+  secondaryColor  String  @default("#1e293b")
+  buttonColor     String  @default("#2563eb")
+  textColor       String  @default("#111827")
+  backgroundColor String  @default("#ffffff")
+  promoColor      String  @default("#dc2626")
+  fontFamily      String  @default("Inter")
 
   updatedAt DateTime @updatedAt
 }
@@ -1014,17 +1027,17 @@ model EcommerceSection {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   storeId String
-  store EcommerceStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store   EcommerceStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
-  type EcommerceSectionType
-  title String?
-  subtitle String?
-  config Json @default("{}")
+  type      EcommerceSectionType
+  title     String?
+  subtitle  String?
+  config    Json                 @default("{}")
   sortOrder Int
-  enabled Boolean @default(true)
+  enabled   Boolean              @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1037,13 +1050,13 @@ model EcommerceSection {
 // deleteMany, never findUnique/delete with the composite key.
 model EcommerceStoreBranch {
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   storeId String
-  store EcommerceStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store   EcommerceStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   branchId String
-  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   @@id([storeId, branchId])
 }
@@ -1060,19 +1073,19 @@ model LinkPage {
   id String @id @default(cuid())
 
   tenantId String @unique
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  slug String @unique
-  title String
-  bio String?
-  avatarUrl String?
-  status LinkPageStatus @default(DRAFT)
-  primaryColor String @default("#2563eb")
-  backgroundColor String @default("#ffffff")
-  textColor String @default("#111827")
+  slug            String         @unique
+  title           String
+  bio             String?
+  avatarUrl       String?
+  status          LinkPageStatus @default(DRAFT)
+  primaryColor    String         @default("#2563eb")
+  backgroundColor String         @default("#ffffff")
+  textColor       String         @default("#111827")
   // Opt-in: a tenant may not want the chat widget floating on their bio page
   // even if they'd otherwise use the AI agent on other channels.
-  chatEnabled Boolean @default(false)
+  chatEnabled     Boolean        @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1084,19 +1097,19 @@ model LinkPageItem {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   linkPageId String
-  linkPage LinkPage @relation(fields: [linkPageId], references: [id], onDelete: Cascade)
+  linkPage   LinkPage @relation(fields: [linkPageId], references: [id], onDelete: Cascade)
 
-  label String
-  url String
+  label      String
+  url        String
   // Cosmetic key rendered client-side (whatsapp|instagram|facebook|tiktok|link) —
   // never validated against MetaConnection; the operator pastes whatever URL they want.
-  icon String?
-  sortOrder Int
-  enabled Boolean @default(true)
-  clickCount Int @default(0)
+  icon       String?
+  sortOrder  Int
+  enabled    Boolean @default(true)
+  clickCount Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1148,16 +1161,16 @@ model Category {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
-  slug String
+  name     String
+  slug     String
   parentId String?
-  parent Category? @relation("CategoryToParent", fields: [parentId], references: [id], onDelete: SetNull)
+  parent   Category?  @relation("CategoryToParent", fields: [parentId], references: [id], onDelete: SetNull)
   children Category[] @relation("CategoryToParent")
 
-  sortOrder Int @default(0)
-  status CategoryStatus @default(ACTIVE)
+  sortOrder Int            @default(0)
+  status    CategoryStatus @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1172,15 +1185,15 @@ model Product {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   categoryId String?
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  name String
-  slug String
+  name        String
+  slug        String
   description String?
-  status ProductStatus @default(DRAFT)
+  status      ProductStatus @default(DRAFT)
 
   // Products that need lead time before they're ready — cold-chain
   // medication, made-to-order food, frozen goods. Only surfaced to the
@@ -1189,17 +1202,17 @@ model Product {
   // fulfillmentType === 'PICKUP' — a delivery/shipping order already has
   // transit time covering this, informing about it there would be noise).
   requiresPreparation Boolean @default(false)
-  preparationReason String?
-  preparationMinutes Int?
+  preparationReason   String?
+  preparationMinutes  Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  variants ProductVariant[]
-  media ProductMedia[]
+  variants       ProductVariant[]
+  media          ProductMedia[]
   branchProducts BranchProduct[]
-  cartItems CartItem[]
-  orderItems OrderItem[]
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
 
   @@unique([tenantId, slug])
   @@index([tenantId, categoryId])
@@ -1210,25 +1223,25 @@ model ProductVariant {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   productId String
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   // Null for the implicit single-variant case of a "simple" product.
-  name String?
-  sku String
+  name       String?
+  sku        String
   // Free-form option payload, e.g. { size: "M", color: "Rojo" }.
-  attributes Json @default("{}")
-  sortOrder Int @default(0)
+  attributes Json    @default("{}")
+  sortOrder  Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   branchProducts BranchProduct[]
-  transferItems InventoryTransferItem[]
-  cartItems CartItem[]
-  orderItems OrderItem[]
+  transferItems  InventoryTransferItem[]
+  cartItems      CartItem[]
+  orderItems     OrderItem[]
 
   @@unique([tenantId, sku])
   @@index([productId])
@@ -1238,14 +1251,14 @@ model ProductMedia {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   productId String
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  url String
-  altText String?
-  sortOrder Int @default(0)
+  url       String
+  altText   String?
+  sortOrder Int     @default(0)
   isPrimary Boolean @default(false)
 
   createdAt DateTime @default(now())
@@ -1257,27 +1270,27 @@ model BranchProduct {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   branchId String
-  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   // Denormalized alongside variantId (both are in the documented field list)
   // for query convenience — always derivable via variant.productId too.
   productId String
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   variantId String
-  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
-  price Decimal @db.Decimal(10, 2)
+  price          Decimal  @db.Decimal(10, 2)
   compareAtPrice Decimal? @db.Decimal(10, 2)
 
-  stock Int @default(0)
-  reservedStock Int @default(0)
-  minStock Int?
-  maxStock Int?
-  reorderPoint Int?
+  stock         Int  @default(0)
+  reservedStock Int  @default(0)
+  minStock      Int?
+  maxStock      Int?
+  reorderPoint  Int?
 
   status BranchProductStatus @default(UNAVAILABLE)
 
@@ -1294,15 +1307,15 @@ model InventoryMovement {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   branchProductId String
-  branchProduct BranchProduct @relation(fields: [branchProductId], references: [id], onDelete: Cascade)
+  branchProduct   BranchProduct @relation(fields: [branchProductId], references: [id], onDelete: Cascade)
 
-  type InventoryMovementType
+  type            InventoryMovementType
   // Signed: positive = stock in, negative = stock out.
-  quantityChange Int
-  note String?
+  quantityChange  Int
+  note            String?
   createdByUserId String?
 
   createdAt DateTime @default(now())
@@ -1314,19 +1327,19 @@ model InventoryTransfer {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   fromBranchId String
-  fromBranch Branch @relation("TransferFromBranch", fields: [fromBranchId], references: [id], onDelete: Cascade)
+  fromBranch   Branch @relation("TransferFromBranch", fields: [fromBranchId], references: [id], onDelete: Cascade)
 
   toBranchId String
-  toBranch Branch @relation("TransferToBranch", fields: [toBranchId], references: [id], onDelete: Cascade)
+  toBranch   Branch @relation("TransferToBranch", fields: [toBranchId], references: [id], onDelete: Cascade)
 
-  status InventoryTransferStatus @default(PENDING)
-  note String?
+  status          InventoryTransferStatus @default(PENDING)
+  note            String?
   createdByUserId String?
 
-  createdAt DateTime @default(now())
+  createdAt   DateTime  @default(now())
   completedAt DateTime?
 
   items InventoryTransferItem[]
@@ -1338,13 +1351,13 @@ model InventoryTransferItem {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   transferId String
-  transfer InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  transfer   InventoryTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
 
   variantId String
-  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   quantity Int
 
@@ -1382,27 +1395,27 @@ model CustomerAddress {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   contactId String
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
-  label String
+  label         String
   recipientName String
-  phone String
-  addressLine String
-  reference String?
-  city String?
-  zone String?
-  latitude Float?
-  longitude Float?
-  notes String?
-  isDefault Boolean @default(false)
+  phone         String
+  addressLine   String
+  reference     String?
+  city          String?
+  zone          String?
+  latitude      Float?
+  longitude     Float?
+  notes         String?
+  isDefault     Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders Order[]
+  orders       Order[]
   appointments Appointment[]
   fulfillments Fulfillment[]
 
@@ -1413,13 +1426,13 @@ model CommerceSession {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   contactId String
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   conversationId String?
-  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   // Plain scalar, not a formal relation — always just the tenant's one
   // EcommerceStore; a real FK here would add cross-module coupling for no
@@ -1427,7 +1440,7 @@ model CommerceSession {
   storeId String?
 
   branchId String?
-  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   // Denormalized copy of the linked cart's id, matching the documented field
   // list. The authoritative relation is the other direction: Cart.commerceSessionId.
@@ -1443,7 +1456,7 @@ model CommerceSession {
   // customer's browser presents instead of a staff JWT. High-entropy
   // (randomBytes(32).hex), expiring, regenerable. Null until a link has
   // ever been generated for this session.
-  publicToken String? @unique
+  publicToken          String?   @unique
   publicTokenExpiresAt DateTime?
 
   createdAt DateTime @default(now())
@@ -1452,7 +1465,7 @@ model CommerceSession {
   // Was a to-one `cart Cart?` (Cart.commerceSessionId used to be @unique) —
   // now to-many so a session can accumulate more than one Cart over its
   // lifetime; CommerceSessionsService picks the single ACTIVE one, if any.
-  carts Cart[]
+  carts        Cart[]
   appointments Appointment[]
 
   @@index([tenantId, contactId])
@@ -1462,10 +1475,10 @@ model Cart {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   contactId String
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   // Was @unique (strict 1:1) — relaxed to a plain indexed FK so a session
   // can accumulate more than one Cart over its lifetime (e.g. a customer
@@ -1473,22 +1486,22 @@ model Cart {
   // CommerceSessionsService.getOrCreateCart already only ever treats the
   // single ACTIVE one as "the" cart; see its docblock.
   commerceSessionId String
-  commerceSession CommerceSession @relation(fields: [commerceSessionId], references: [id], onDelete: Cascade)
+  commerceSession   CommerceSession @relation(fields: [commerceSessionId], references: [id], onDelete: Cascade)
 
   conversationId String?
-  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
 
   branchId String?
-  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
-  status CartStatus @default(ACTIVE)
-  currency String @default("BOB")
+  status   CartStatus @default(ACTIVE)
+  currency String     @default("BOB")
 
   subtotal Decimal @default(0) @db.Decimal(10, 2)
   discount Decimal @default(0) @db.Decimal(10, 2)
   shipping Decimal @default(0) @db.Decimal(10, 2)
-  tax Decimal @default(0) @db.Decimal(10, 2)
-  total Decimal @default(0) @db.Decimal(10, 2)
+  tax      Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @default(0) @db.Decimal(10, 2)
 
   expiresAt DateTime?
 
@@ -1510,22 +1523,22 @@ model CartItem {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   cartId String
-  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
 
   productId String
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   variantId String
-  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
-  quantity Int
+  quantity  Int
   unitPrice Decimal @db.Decimal(10, 2)
-  discount Decimal @default(0) @db.Decimal(10, 2)
-  subtotal Decimal @db.Decimal(10, 2)
-  metadata Json @default("{}")
+  discount  Decimal @default(0) @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+  metadata  Json    @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1537,32 +1550,32 @@ model Order {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   contactId String
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   cartId String @unique
-  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
 
   branchId String?
-  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   addressId String?
-  address CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  address   CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
 
   // e.g. "ORD-<base36 timestamp>" — collision-proof enough for this phase; a
   // real per-tenant sequence is a documented future refinement.
   orderNumber String
 
-  status OrderStatus @default(CONFIRMED)
+  status          OrderStatus     @default(CONFIRMED)
   fulfillmentType FulfillmentType
 
   subtotal Decimal @db.Decimal(10, 2)
   discount Decimal @default(0) @db.Decimal(10, 2)
   shipping Decimal @default(0) @db.Decimal(10, 2)
-  tax Decimal @default(0) @db.Decimal(10, 2)
-  total Decimal @db.Decimal(10, 2)
+  tax      Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
   currency String
 
   confirmedAt DateTime?
@@ -1580,9 +1593,9 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items OrderItem[]
+  items         OrderItem[]
   statusHistory OrderStatusHistory[]
-  fulfillment Fulfillment?
+  fulfillment   Fulfillment?
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId, contactId])
@@ -1592,14 +1605,14 @@ model OrderStatusHistory {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   orderId String
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  fromStatus OrderStatus?
-  toStatus OrderStatus
-  note String?
+  fromStatus      OrderStatus?
+  toStatus        OrderStatus
+  note            String?
   changedByUserId String?
 
   createdAt DateTime @default(now())
@@ -1611,32 +1624,32 @@ model OrderItem {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   orderId String
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   productId String
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   variantId String
-  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
 
   // Snapshots so a historical order doesn't change if the product is later
   // renamed/repriced.
   productNameSnapshot String
-  skuSnapshot String
+  skuSnapshot         String
 
   // Snapshot of Product.requiresPreparation/preparationReason/preparationMinutes
   // at purchase time — same rationale as the name/SKU snapshots above.
   requiresPreparationSnapshot Boolean @default(false)
-  preparationReasonSnapshot String?
-  preparationMinutesSnapshot Int?
+  preparationReasonSnapshot   String?
+  preparationMinutesSnapshot  Int?
 
-  quantity Int
+  quantity  Int
   unitPrice Decimal @db.Decimal(10, 2)
-  discount Decimal @default(0) @db.Decimal(10, 2)
-  subtotal Decimal @db.Decimal(10, 2)
+  discount  Decimal @default(0) @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
 
   createdAt DateTime @default(now())
 
@@ -1685,20 +1698,20 @@ model BookingService {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
-  slug String
-  description String?
+  name            String
+  slug            String
+  description     String?
   durationMinutes Int
-  price Decimal @db.Decimal(10, 2)
-  status BookingServiceStatus @default(ACTIVE)
+  price           Decimal              @db.Decimal(10, 2)
+  status          BookingServiceStatus @default(ACTIVE)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  qualifiedUsers BookingServiceUser[]
-  resources BookingResourceService[]
+  qualifiedUsers      BookingServiceUser[]
+  resources           BookingResourceService[]
   appointmentServices AppointmentService[]
 
   @@unique([tenantId, slug])
@@ -1708,10 +1721,10 @@ model BookingService {
 // create/findFirst/findMany/deleteMany, never findUnique/delete.
 model BookingServiceUser {
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   serviceId String
-  service BookingService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service   BookingService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   userId String
 
@@ -1722,13 +1735,13 @@ model BookingResource {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   branchId String
-  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  name String
-  type BookingResourceType
+  name   String
+  type   BookingResourceType
   // Only meaningful when type == STAFF.
   userId String?
   status BookingResourceStatus @default(ACTIVE)
@@ -1736,8 +1749,8 @@ model BookingResource {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  services BookingResourceService[]
-  schedule BookingResourceSchedule[]
+  services             BookingResourceService[]
+  schedule             BookingResourceSchedule[]
   appointmentResources AppointmentResource[]
 
   @@index([tenantId, branchId])
@@ -1746,13 +1759,13 @@ model BookingResource {
 // Composite PK join — same caveat as above.
 model BookingResourceService {
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   resourceId String
-  resource BookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resource   BookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 
   serviceId String
-  service BookingService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service   BookingService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   @@id([resourceId, serviceId])
 }
@@ -1761,14 +1774,14 @@ model BookingResourceSchedule {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   resourceId String
-  resource BookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resource   BookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 
-  dayOfWeek Int // 0=Sunday .. 6=Saturday
+  dayOfWeek   Int // 0=Sunday .. 6=Saturday
   startMinute Int // minutes from midnight
-  endMinute Int
+  endMinute   Int
 
   createdAt DateTime @default(now())
 
@@ -1779,14 +1792,14 @@ model UserSchedule {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  userId String
-  name String
-  timezone String @default("America/La_Paz")
-  status UserScheduleStatus @default(ACTIVE)
+  userId        String
+  name          String
+  timezone      String             @default("America/La_Paz")
+  status        UserScheduleStatus @default(ACTIVE)
   effectiveFrom DateTime?
-  effectiveTo DateTime?
+  effectiveTo   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1800,14 +1813,14 @@ model UserScheduleInterval {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   userScheduleId String
-  userSchedule UserSchedule @relation(fields: [userScheduleId], references: [id], onDelete: Cascade)
+  userSchedule   UserSchedule @relation(fields: [userScheduleId], references: [id], onDelete: Cascade)
 
-  dayOfWeek Int
+  dayOfWeek   Int
   startMinute Int
-  endMinute Int
+  endMinute   Int
 
   createdAt DateTime @default(now())
 
@@ -1818,12 +1831,12 @@ model UserTimeOff {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  userId String
+  userId  String
   startAt DateTime
-  endAt DateTime
-  reason String?
+  endAt   DateTime
+  reason  String?
 
   createdAt DateTime @default(now())
 
@@ -1837,12 +1850,12 @@ model BookingBlackoutDate {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   branchId String
-  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
-  date DateTime @db.Date
+  date   DateTime @db.Date
   reason String?
 
   createdAt DateTime @default(now())
@@ -1855,24 +1868,24 @@ model Appointment {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   contactId String
-  contact Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
 
   branchId String
-  branch Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
 
   commerceSessionId String?
-  commerceSession CommerceSession? @relation(fields: [commerceSessionId], references: [id], onDelete: SetNull)
+  commerceSession   CommerceSession? @relation(fields: [commerceSessionId], references: [id], onDelete: SetNull)
 
   addressId String?
-  address CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  address   CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
 
   startAt DateTime
-  endAt DateTime
-  status AppointmentStatus @default(CONFIRMED)
-  notes String?
+  endAt   DateTime
+  status  AppointmentStatus @default(CONFIRMED)
+  notes   String?
 
   // Who this specific appointment is FOR, when it differs from the booking
   // contact — e.g. a parent (contactId) booking a pediatric dental checkup
@@ -1883,10 +1896,10 @@ model Appointment {
   // parent booking sequential turns for several patients) share this id —
   // purely a grouping label, each Appointment is still otherwise independent
   // (its own status, its own resource/time slot).
-  groupId String?
+  groupId     String?
 
   subtotal Decimal @db.Decimal(10, 2)
-  total Decimal @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
   currency String
 
   confirmedAt DateTime?
@@ -1894,10 +1907,10 @@ model Appointment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  services AppointmentService[]
-  resources AppointmentResource[]
+  services      AppointmentService[]
+  resources     AppointmentResource[]
   statusHistory AppointmentStatusHistory[]
-  fulfillment Fulfillment?
+  fulfillment   Fulfillment?
 
   @@index([tenantId, branchId, startAt])
   @@index([tenantId, contactId])
@@ -1908,18 +1921,18 @@ model AppointmentService {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   appointmentId String
-  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
   serviceId String
-  service BookingService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  service   BookingService @relation(fields: [serviceId], references: [id], onDelete: Cascade)
 
   // Snapshots so a historical appointment doesn't change if the service is
   // later renamed/repriced.
-  serviceNameSnapshot String
-  priceSnapshot Decimal @db.Decimal(10, 2)
+  serviceNameSnapshot     String
+  priceSnapshot           Decimal @db.Decimal(10, 2)
   durationMinutesSnapshot Int
 
   createdAt DateTime @default(now())
@@ -1930,13 +1943,13 @@ model AppointmentService {
 // Composite PK join — same caveat as above.
 model AppointmentResource {
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   appointmentId String
-  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
   resourceId String
-  resource BookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  resource   BookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
 
   @@id([appointmentId, resourceId])
 }
@@ -1945,14 +1958,14 @@ model AppointmentStatusHistory {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   appointmentId String
-  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
-  fromStatus AppointmentStatus?
-  toStatus AppointmentStatus
-  note String?
+  fromStatus      AppointmentStatus?
+  toStatus        AppointmentStatus
+  note            String?
   changedByUserId String?
 
   createdAt DateTime @default(now())
@@ -1971,10 +1984,10 @@ model Event {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  type String
-  payload Json @default("{}")
+  type    String
+  payload Json   @default("{}")
 
   // Plain scalar, not a formal relation — same rationale as Contact.ownerId:
   // avoids a hard FK when the emitting event's contact context is optional.
@@ -2017,11 +2030,11 @@ model Flow {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
+  name        String
   description String?
-  status FlowStatus @default(DRAFT)
+  status      FlowStatus @default(DRAFT)
 
   // Who "acts" for this flow's actions (message sender, note author, status-
   // transition actor). There's no system/bot-user concept in this codebase,
@@ -2031,8 +2044,8 @@ model Flow {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  nodes FlowNode[]
-  edges FlowEdge[]
+  nodes      FlowNode[]
+  edges      FlowEdge[]
   executions FlowExecution[]
 
   @@index([tenantId, status])
@@ -2042,19 +2055,19 @@ model FlowNode {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   flowId String
-  flow Flow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  flow   Flow   @relation(fields: [flowId], references: [id], onDelete: Cascade)
 
-  type FlowNodeType
+  type    FlowNodeType
   // TRIGGER: EVENT|SCHEDULE|MANUAL. CONDITION: FIELD_COMPARISON.
   // ACTION: SEND_MESSAGE|ADD_TAG|REMOVE_TAG|ADD_NOTE|ASSIGN_CONVERSATION|
   //         UPDATE_ORDER_STATUS|UPDATE_APPOINTMENT_STATUS|WEBHOOK_CALL.
   // WAIT: DELAY. END: END.
   subtype String
-  name String?
-  config Json @default("{}")
+  name    String?
+  config  Json         @default("{}")
 
   positionX Float @default(0)
   positionY Float @default(0)
@@ -2072,16 +2085,16 @@ model FlowEdge {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   flowId String
-  flow Flow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  flow   Flow   @relation(fields: [flowId], references: [id], onDelete: Cascade)
 
   sourceNodeId String
-  sourceNode FlowNode @relation("FlowEdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
+  sourceNode   FlowNode @relation("FlowEdgeSource", fields: [sourceNodeId], references: [id], onDelete: Cascade)
 
   targetNodeId String
-  targetNode FlowNode @relation("FlowEdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
+  targetNode   FlowNode @relation("FlowEdgeTarget", fields: [targetNodeId], references: [id], onDelete: Cascade)
 
   // 'true' | 'false' for CONDITION branches; null otherwise.
   sourceHandle String?
@@ -2096,18 +2109,18 @@ model FlowExecution {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   flowId String
-  flow Flow @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  flow   Flow   @relation(fields: [flowId], references: [id], onDelete: Cascade)
 
-  status FlowExecutionStatus @default(RUNNING)
+  status           FlowExecutionStatus @default(RUNNING)
   triggerEventType String?
-  contextData Json @default("{}")
-  currentNodeId String?
-  errorMessage String?
+  contextData      Json                @default("{}")
+  currentNodeId    String?
+  errorMessage     String?
 
-  startedAt DateTime @default(now())
+  startedAt  DateTime  @default(now())
   finishedAt DateTime?
 
   logs FlowExecutionLog[]
@@ -2119,18 +2132,18 @@ model FlowExecutionLog {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   executionId String
-  execution FlowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
+  execution   FlowExecution @relation(fields: [executionId], references: [id], onDelete: Cascade)
 
   nodeId String
   status FlowExecutionLogStatus
-  input Json?
+  input  Json?
   output Json?
-  error String?
+  error  String?
 
-  startedAt DateTime @default(now())
+  startedAt  DateTime  @default(now())
   finishedAt DateTime?
 
   @@index([tenantId, executionId])
@@ -2157,11 +2170,11 @@ model MessageTemplate {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Meta's naming rule: lowercase letters, digits, underscores only.
   // Enforced in CreateTemplateDto, not just here.
-  name String
+  name     String
   category TemplateCategory
   // Locale code, e.g. "es", "es_MX", "en_US" — free text, not an enum,
   // matching Meta's own open-ended language list.
@@ -2171,15 +2184,15 @@ model MessageTemplate {
   // Meta's numbered placeholder convention: {{1}}, {{2}}, ... No header/
   // footer variables and no buttons/media in this first pass — a stated
   // simplification vs. Meta's full component set.
-  bodyText String
+  bodyText   String
   footerText String?
 
-  status TemplateStatus @default(DRAFT)
+  status             TemplateStatus @default(DRAFT)
   // Meta's own template id, set once POST .../message_templates succeeds.
   externalTemplateId String?
-  rejectionReason String?
-  submittedAt DateTime?
-  reviewedAt DateTime?
+  rejectionReason    String?
+  submittedAt        DateTime?
+  reviewedAt         DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2194,14 +2207,14 @@ model Segment {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
+  name        String
   description String?
   // Plain AND-of-fields filter mirroring ContactsService.list's existing
   // shape ({status?, type?, tagIds?: string[]}) — not a full query builder,
   // a stated simplification.
-  filterQuery Json @default("{}")
+  filterQuery Json    @default("{}")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2222,24 +2235,24 @@ model Campaign {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
+  name        String
   description String?
 
   templateId String
-  template MessageTemplate @relation(fields: [templateId], references: [id])
+  template   MessageTemplate @relation(fields: [templateId], references: [id])
 
   segmentId String
-  segment Segment @relation(fields: [segmentId], references: [id])
+  segment   Segment @relation(fields: [segmentId], references: [id])
 
   // {"1": {source:"contact_field"|"static", value:"name"|"20%"}, ...} — how
   // each of the template's {{n}} placeholders is resolved per recipient.
   variableMapping Json @default("{}")
 
-  status CampaignStatus @default(DRAFT)
+  status      CampaignStatus @default(DRAFT)
   scheduledAt DateTime?
-  startedAt DateTime?
+  startedAt   DateTime?
   completedAt DateTime?
 
   createdByUserId String
@@ -2265,16 +2278,16 @@ model CampaignRecipient {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   campaignId String
-  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
 
   contactId String
 
-  status CampaignRecipientStatus @default(PENDING)
+  status       CampaignRecipientStatus @default(PENDING)
   errorMessage String?
-  sentAt DateTime?
+  sentAt       DateTime?
 
   createdAt DateTime @default(now())
 
@@ -2302,32 +2315,277 @@ model Fulfillment {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   orderId String? @unique
-  order Order? @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order   Order?  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  appointmentId String? @unique
-  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  appointmentId String?      @unique
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
 
-  type FulfillmentType
+  type   FulfillmentType
   status FulfillmentStatus @default(PENDING)
 
   branchId String?
-  branch Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
 
   addressId String?
-  address CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  address   CustomerAddress? @relation(fields: [addressId], references: [id], onDelete: SetNull)
 
-  scheduledAt DateTime?
-  completedAt DateTime?
+  scheduledAt    DateTime?
+  completedAt    DateTime?
   receivedByName String?
-  note String?
+  note           String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  routeStop DeliveryRouteStop?
+
   @@index([tenantId, status])
+}
+
+// Phase 19: Manual delivery routes — DOMAIN_RULES.md: "Delivery manual es una
+// herramienta operativa, no un motor logístico autónomo". No zones/rates/
+// drivers/live tracking here (that's Phase 20, "Delivery futuro"); a route is
+// just a day's LOCAL_DELIVERY fulfillments grouped and sequenced by hand.
+enum DeliveryRouteStatus {
+  PLANNED
+  PREPARING
+  IN_ROUTE
+  PARTIALLY_COMPLETED
+  COMPLETED
+  CANCELLED
+}
+
+enum DeliveryRouteStopStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+model DeliveryRoute {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  routeDate DateTime @db.Date
+
+  responsibleUserId String?
+  responsibleUser   User?   @relation(fields: [responsibleUserId], references: [id], onDelete: SetNull)
+
+  status      DeliveryRouteStatus @default(PLANNED)
+  startedAt   DateTime?
+  completedAt DateTime?
+  notes       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stops       DeliveryRouteStop[]
+  assignments DeliveryAssignment[]
+
+  @@index([tenantId, branchId, routeDate])
+}
+
+model DeliveryRouteStop {
+  id String @id @default(cuid())
+
+  routeId String
+  route   DeliveryRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  // A fulfillment can only ever be on one route at a time.
+  fulfillmentId String      @unique
+  fulfillment   Fulfillment @relation(fields: [fulfillmentId], references: [id], onDelete: Cascade)
+
+  sequence    Int
+  status      DeliveryRouteStopStatus @default(PENDING)
+  plannedAt   DateTime?
+  completedAt DateTime?
+  notes       String?
+
+  @@index([routeId, sequence])
+}
+
+// Fase 20 (primer incremento): flota propia (drivers/vehicles/asignación),
+// zonas/tarifas de envío, y método de entrega configurable por tenant/
+// sucursal (flota propia u notificación por Telegram). Deliberadamente NO
+// incluye: tracking GPS en vivo, prueba de entrega, ni ningún adapter real
+// de proveedor externo (ver DeliveryProviderAdapter — queda solo la
+// interfaz preparada, sin implementación, hasta elegir un proveedor real).
+enum DeliveryProviderType {
+  OWN_FLEET
+  TELEGRAM_NOTIFY
+}
+
+enum DeliveryOperationMode {
+  ROUTE_BASED
+  IMMEDIATE
+}
+
+model DeliveryProviderConfig {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // null = default del tenant; una fila con branchId seteado lo sobreescribe
+  // para esa sucursal únicamente.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  type DeliveryProviderType @default(OWN_FLEET)
+
+  // Solo tiene efecto con type: TELEGRAM_NOTIFY (OWN_FLEET siempre opera por
+  // rutas, Fase 19). ROUTE_BASED: se avisa al agregar el pedido a una ruta
+  // (como hoy). IMMEDIATE: el pedido se entrega suelto, sin ruta — se avisa
+  // directo al confirmarse el pedido.
+  operationMode DeliveryOperationMode @default(ROUTE_BASED)
+
+  // TELEGRAM_NOTIFY: { chatId: string }. El bot token nunca va acá en texto
+  // plano — ver botTokenEncrypted.
+  config Json?
+
+  // Reusa encryptSecret/decryptSecret (@omniflow/utils), mismo patrón que
+  // TenantMetaAppService.appSecretEncrypted.
+  botTokenEncrypted String?
+
+  enabled Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, branchId])
+}
+
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Driver {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // null = disponible para cualquier sucursal del tenant.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  name   String
+  phone  String
+  status DriverStatus @default(ACTIVE)
+  notes  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments DeliveryAssignment[]
+}
+
+enum VehicleType {
+  MOTORCYCLE
+  CAR
+  BICYCLE
+  VAN
+  OTHER
+}
+
+model Vehicle {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
+  type  VehicleType
+  // e.g. "Moto roja" — free text, not a vehicle-model catalog.
+  label String?
+  plate String?
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments DeliveryAssignment[]
+}
+
+// Append-only: reasignar una ruta nunca sobrescribe quién estaba asignado,
+// crea una fila nueva y cierra la anterior (unassignedAt) — SECURITY.md
+// exige auditar "rutas y asignaciones"; esto lo cumple sin una tabla de
+// auditoría separada.
+model DeliveryAssignment {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  routeId String
+  route   DeliveryRoute @relation(fields: [routeId], references: [id], onDelete: Cascade)
+
+  driverId String
+  driver   Driver @relation(fields: [driverId], references: [id], onDelete: Restrict)
+
+  // El vehículo puede variar de un día a otro para el mismo driver, por eso
+  // vive en la asignación y no como un campo fijo en Driver.
+  vehicleId String?
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  assignedByUserId String
+  assignedByUser   User   @relation(fields: [assignedByUserId], references: [id], onDelete: Cascade)
+
+  assignedAt   DateTime  @default(now())
+  // null = asignación vigente de esta ruta.
+  unassignedAt DateTime?
+
+  @@index([routeId, unassignedAt])
+}
+
+enum DeliveryZoneMatchType {
+  ZONE_LABEL
+  RADIUS_KM
+}
+
+// Simplificado a un solo modelo (la documentación nombra zonas y tarifas
+// como 4 tablas separadas, sin ningún campo) — una zona ya lleva su propia
+// tarifa; separar "tarifa" de "zona" es una normalización que nadie pidió
+// todavía (se puede partir el día que haga falta un precio por nivel/peso).
+model DeliveryZone {
+  id String @id @default(cuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  name String
+
+  matchType  DeliveryZoneMatchType
+  // Usado si matchType = ZONE_LABEL, contra CustomerAddress.zone.
+  zoneLabels String[]
+  // Usado si matchType = RADIUS_KM, contra Branch.latitude/longitude.
+  radiusKm   Float?
+
+  baseFee        Decimal  @db.Decimal(10, 2)
+  freeOverAmount Decimal? @db.Decimal(10, 2)
+
+  // La primera zona habilitada que matchea (en este orden) gana.
+  sortOrder Int     @default(0)
+  enabled   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, branchId, sortOrder])
 }
 
 enum PaymentMethodType {
@@ -2344,18 +2602,18 @@ model PaymentMethod {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  type PaymentMethodType
-  label String
-  enabled Boolean @default(true)
-  sortOrder Int @default(0)
+  type      PaymentMethodType
+  label     String
+  enabled   Boolean           @default(true)
+  sortOrder Int               @default(0)
 
   // Free-form text shown to the customer (account number, bank name,
   // account holder, etc.) for CASH/BANK_TRANSFER.
   instructions String?
   // QR code image URL (type QR), uploaded via StorageService.
-  qrImageUrl String?
+  qrImageUrl   String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2372,7 +2630,7 @@ model Notification {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Always targeted to one user — a "broadcast" is fanned out as one row
   // per active tenant user at creation time (NotificationsService.create()),
@@ -2380,10 +2638,10 @@ model Notification {
   // broadcast can't be marked read for everyone by one person opening it.
   userId String
 
-  type String
+  type  String
   title String
-  body String?
-  link String?
+  body  String?
+  link  String?
 
   readAt DateTime?
 
@@ -2411,11 +2669,11 @@ enum AiProviderType {
 // no raw key is ever stored here (SECURITY.md: secrets live in env vars,
 // never committed/stored in the DB).
 model AiProvider {
-  id String @id @default(cuid())
-  type AiProviderType @unique
+  id    String         @id @default(cuid())
+  type  AiProviderType @unique
   label String
 
-  models AiModel[]
+  models            AiModel[]
   tenantCredentials TenantAiCredential[]
 
   createdAt DateTime @default(now())
@@ -2430,12 +2688,12 @@ model AiProvider {
 // AiReplyService's own comment for the rationale). apiKeyEncrypted is
 // AES-256-GCM via packages/utils/crypto.ts, never stored in plaintext.
 model TenantAiCredential {
-  id String @id @default(cuid())
+  id       String @id @default(cuid())
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   providerId String
-  provider AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  provider   AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
   apiKeyEncrypted String
 
@@ -2454,14 +2712,14 @@ model AiModel {
   id String @id @default(cuid())
 
   providerId String
-  provider AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  provider   AiProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
 
-  name String // literal model id sent to the provider's API, e.g. "gpt-4o-mini"
-  label String // e.g. "GPT-4o mini"
+  name         String // literal model id sent to the provider's API, e.g. "gpt-4o-mini"
+  label        String // e.g. "GPT-4o mini"
   capabilities String[] // e.g. ["text", "vision"] — AI_SPEC.md's Providers capability list
   // INACTIVE for models of a not-yet-wired provider (Anthropic/Gemini) so the
   // Agent form only offers models that can actually run a completion today.
-  status AiModelStatus @default(ACTIVE)
+  status       AiModelStatus @default(ACTIVE)
 
   agents AiAgent[]
 
@@ -2480,20 +2738,20 @@ model AiAgent {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  name String
+  name   String
   // Starts INACTIVE — a tenant must deliberately activate an agent (and pick
   // its channels below) before anything auto-replies to a real customer.
   status AiAgentStatus @default(INACTIVE)
 
   modelId String
-  model AiModel @relation(fields: [modelId], references: [id])
+  model   AiModel @relation(fields: [modelId], references: [id])
 
-  temperature Float @default(0.7)
-  goal String?
+  temperature Float   @default(0.7)
+  goal        String?
   personality String?
-  language String @default("es")
+  language    String  @default("es")
 
   // Plain scalar array rather than a join table (the BookingServiceUser/
   // EcommerceStoreBranch convention elsewhere): there's a fixed, tiny enum
@@ -2521,7 +2779,7 @@ model AiAgent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  usage AiUsage[]
+  usage              AiUsage[]
   knowledgeDocuments AiAgentKnowledgeDocument[]
 
   @@index([tenantId, status])
@@ -2534,19 +2792,19 @@ model AiUsage {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   agentId String
-  agent AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agent   AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   // Plain scalar, not a formal relation — same rationale as Contact.ownerId
   // (the conversation may be deleted long after usage rows are kept for
   // billing history).
   conversationId String?
 
-  promptTokens Int
+  promptTokens     Int
   completionTokens Int
-  totalTokens Int
+  totalTokens      Int
 
   createdAt DateTime @default(now())
 
@@ -2574,13 +2832,13 @@ model KnowledgeDocument {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  title String
+  title   String
   content String
   // INACTIVE documents are kept but excluded from retrieval — lets an
   // operator retire outdated content without losing it.
-  status KnowledgeDocumentStatus @default(ACTIVE)
+  status  KnowledgeDocumentStatus @default(ACTIVE)
 
   chunks KnowledgeChunk[]
   agents AiAgentKnowledgeDocument[]
@@ -2595,15 +2853,15 @@ model KnowledgeChunk {
   id String @id @default(cuid())
 
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   documentId String
-  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document   KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
-  content String
+  content    String
   chunkIndex Int
   // JSON array of floats — see the Phase 15 comment above.
-  embedding Json
+  embedding  Json
 
   createdAt DateTime @default(now())
 
@@ -2614,13 +2872,13 @@ model KnowledgeChunk {
 // create/findFirst/findMany/deleteMany, never findUnique/delete.
 model AiAgentKnowledgeDocument {
   tenantId String
-  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   agentId String
-  agent AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  agent   AiAgent @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   documentId String
-  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document   KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
   @@id([agentId, documentId])
 }

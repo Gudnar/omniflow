@@ -16,6 +16,7 @@ import { createCampaignProcessor, finalizeCampaignRecipient } from './campaign-p
 import { processAiReplyJob, type AiReplyJobData } from './ai-processor';
 import { processTranscriptionJob, type TranscriptionJobData } from './transcription-processor';
 import { processFacebookCommentReplyJob, type FacebookCommentReplyJobData } from './facebook-comment-reply-processor';
+import { processDeliveryNotifyJob, type DeliveryNotifyJobData } from './delivery-notify-processor';
 
 const connection = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', {
   maxRetriesPerRequest: null,
@@ -170,8 +171,33 @@ facebookCommentsOutboundWorker.on('failed', (job, error) => {
   logger.error('Facebook comment reply job failed', error, { jobId: job?.id, commentId: job?.data.commentId });
 });
 
+// Fase 20: notificación de entrega por Telegram — mismo patrón de arriba.
+const deliveryNotifyWorker = new Worker<DeliveryNotifyJobData>(
+  'delivery-notify',
+  async (job) => {
+    await processDeliveryNotifyJob(job.data);
+  },
+  { connection, concurrency: 5 },
+);
+
+deliveryNotifyWorker.on('completed', (job) => {
+  logger.info('Delivery notify job completed', { jobId: job.id, stopId: job.data.stopId });
+});
+
+deliveryNotifyWorker.on('failed', (job, error) => {
+  logger.error('Delivery notify job failed', error, { jobId: job?.id, stopId: job?.data.stopId });
+});
+
 logger.info('Worker started and listening for jobs', {
-  queues: ['channel-outbound', 'workflows', 'campaigns', 'ai-replies', 'transcriptions', 'facebook-comments-outbound'],
+  queues: [
+    'channel-outbound',
+    'workflows',
+    'campaigns',
+    'ai-replies',
+    'transcriptions',
+    'facebook-comments-outbound',
+    'delivery-notify',
+  ],
 });
 
 process.on('SIGTERM', async () => {
@@ -182,6 +208,7 @@ process.on('SIGTERM', async () => {
   await aiRepliesWorker.close();
   await transcriptionsWorker.close();
   await facebookCommentsOutboundWorker.close();
+  await deliveryNotifyWorker.close();
   await connection.quit();
   process.exit(0);
 });

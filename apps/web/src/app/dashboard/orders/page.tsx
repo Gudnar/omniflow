@@ -7,6 +7,7 @@ import { apiGet } from '@/lib/api-client';
 import type { Order } from '@/lib/types';
 import { OrdersTable } from '@/components/orders/orders-table';
 import { OrderDetailPanel } from '@/components/orders/order-detail-panel';
+import { DeliveryRoutesTab } from '@/components/orders/delivery-routes-tab';
 
 const TABS = ['Todos', 'Ventas', 'Reservas', 'Pendientes', 'Preparación', 'Entrega', 'Rutas del día', 'Historial'] as const;
 type Tab = (typeof TABS)[number];
@@ -82,9 +83,7 @@ export default function OrdersPage() {
       {tab === 'Reservas' && (
         <p className="text-sm text-gray-400 text-center py-12">Disponible en la Fase 12 (Reservas).</p>
       )}
-      {tab === 'Rutas del día' && (
-        <p className="text-sm text-gray-400 text-center py-12">Disponible en la Fase 19 (Rutas de entrega).</p>
-      )}
+      {tab === 'Rutas del día' && <DeliveryRoutesTab />}
 
       {tab !== 'Reservas' && tab !== 'Rutas del día' && (
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_420px] gap-4 items-start">

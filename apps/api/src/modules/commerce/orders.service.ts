@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotFoundError, ValidationError } from '@omniflow/utils';
 import { EventsService } from '../events/events.service';
 import { MessagesService } from '../conversations/messages.service';
+import { QueueService } from '../queue/queue.service';
+import { DeliveryProviderConfigService } from '../delivery/delivery-provider-config.service';
 import {
   ListOrdersQueryDto,
   UpdateOrderStatusDto,
@@ -103,7 +105,22 @@ export class OrdersService {
     private prisma: PrismaService,
     private eventsService: EventsService,
     private messagesService: MessagesService,
+    private queueService: QueueService,
+    private deliveryProviderConfigService: DeliveryProviderConfigService,
   ) {}
+
+  // Entrega individual sin ruta (Fase 20) — una sucursal en modo IMMEDIATE
+  // avisa por Telegram apenas el pedido se confirma, no cuando se agrega a
+  // una ruta (que en este flujo nunca se crea). No hace nada si la
+  // sucursal no está en TELEGRAM_NOTIFY+IMMEDIATE, o si el pedido no es
+  // LOCAL_DELIVERY.
+  private async notifyImmediateDeliveryIfConfigured(order: { id: string; tenantId: string; branchId: string | null; fulfillmentType: string }) {
+    if (order.fulfillmentType !== 'LOCAL_DELIVERY' || !order.branchId) return;
+    const config = await this.deliveryProviderConfigService.resolveForBranch(order.tenantId, order.branchId);
+    if (config?.type === 'TELEGRAM_NOTIFY' && config.operationMode === 'IMMEDIATE') {
+      await this.queueService.enqueueDeliveryNotifyForOrder(order.tenantId, order.id);
+    }
+  }
 
   // branchIds: the ACTING user's allowed branches (from their JWT, see
   // UserBranch) — empty means unrestricted. Never trust query.branchId
@@ -368,6 +385,10 @@ export class OrdersService {
         },
         order.contactId,
       );
+    }
+
+    if (toStatus === 'CONFIRMED') {
+      await this.notifyImmediateDeliveryIfConfigured(order);
     }
 
     return this.findOne(id);

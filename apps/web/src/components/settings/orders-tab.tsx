@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPatch } from '@/lib/api-client';
 import type { Tenant, EcommerceStore, FulfillmentType } from '@/lib/types';
+import { DeliverySection } from './delivery-section';
 
 const FULFILLMENT_LABELS: Record<FulfillmentType, string> = {
   PICKUP: 'Retiro en sucursal',
@@ -70,6 +71,7 @@ export function OrdersTab() {
   }
 
   return (
+    <div className="space-y-5">
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
       <div className="space-y-5">
         <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -222,6 +224,8 @@ export function OrdersTab() {
           </a>
         </div>
       </div>
+    </div>
+      <DeliverySection />
     </div>
   );
 }

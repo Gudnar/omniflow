@@ -5,6 +5,9 @@ import { EventsService } from '../events/events.service';
 import { TenantContextService } from '../tenant-context/tenant-context.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ConfirmationImagesService } from '../confirmation-images/confirmation-images.service';
+import { DeliveryZonesService } from '../delivery/delivery-zones.service';
+import { DeliveryProviderConfigService } from '../delivery/delivery-provider-config.service';
+import { QueueService } from '../queue/queue.service';
 import { buildPreparationNotice } from './orders.service';
 import { AddCartItemDto, UpdateCartItemDto, CheckoutDto } from './dto/cart.dto';
 
@@ -65,6 +68,9 @@ export class CartsService {
     private tenantContext: TenantContextService,
     private notificationsService: NotificationsService,
     private confirmationImagesService: ConfirmationImagesService,
+    private deliveryZonesService: DeliveryZonesService,
+    private deliveryProviderConfigService: DeliveryProviderConfigService,
+    private queueService: QueueService,
   ) {}
 
   async findOne(id: string) {
@@ -236,6 +242,25 @@ export class CartsService {
       : null;
     const requiresManualApproval = tenant?.orderApprovalMode === 'MANUAL';
 
+    // Fase 20: zonas/tarifas de envío — recalculado siempre server-side,
+    // nunca se confía en freshCart.shipping (que hoy, sin esto, queda
+    // siempre en 0). PICKUP/SHIPPING no se tocan: sin cargo automático /
+    // tracking code manual, igual que antes.
+    let shipping = Number(freshCart.shipping);
+    if (dto.fulfillmentType === 'LOCAL_DELIVERY') {
+      const address = await this.prisma.client.customerAddress.findUnique({ where: { id: dto.addressId } });
+      const quote = await this.deliveryZonesService.calculateFee(
+        freshCart.branchId,
+        { zone: address?.zone, latitude: address?.latitude, longitude: address?.longitude },
+        Number(freshCart.subtotal),
+      );
+      if (!quote.covered) {
+        throw new ValidationError('Tu dirección está fuera de la zona de cobertura de esta sucursal.');
+      }
+      shipping = quote.fee ?? 0;
+    }
+    const total = Number(freshCart.subtotal) - Number(freshCart.discount) + shipping + Number(freshCart.tax);
+
     // Snapshot whatever GPS location the storefront captured on this
     // session — CommerceSession.metadata.location — onto the order itself.
     // Previously this was captured then silently discarded: the order had
@@ -277,9 +302,9 @@ export class CartsService {
           customerLocation,
           subtotal: freshCart.subtotal,
           discount: freshCart.discount,
-          shipping: freshCart.shipping,
+          shipping,
           tax: freshCart.tax,
-          total: freshCart.total,
+          total,
           currency: freshCart.currency,
         },
       });
@@ -390,6 +415,17 @@ export class CartsService {
         body: `${order.currency} ${Number(order.total).toFixed(2)}`,
         link: '/dashboard/orders',
       });
+    }
+
+    // Entrega individual sin ruta (Fase 20) — mismo chequeo que
+    // OrdersService.notifyImmediateDeliveryIfConfigured, pero acá cubre el
+    // camino de auto-confirmación al pagar (el que confirma manualmente
+    // pasa por transition(), que ya tiene su propio gancho).
+    if (!requiresManualApproval && tenantId && order.fulfillmentType === 'LOCAL_DELIVERY' && order.branchId) {
+      const config = await this.deliveryProviderConfigService.resolveForBranch(tenantId, order.branchId);
+      if (config?.type === 'TELEGRAM_NOTIFY' && config.operationMode === 'IMMEDIATE') {
+        await this.queueService.enqueueDeliveryNotifyForOrder(tenantId, order.id);
+      }
     }
 
     return serializeOrder(order);

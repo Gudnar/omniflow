@@ -985,3 +985,115 @@ export interface StaffUser {
   // Empty = unrestricted (manages every branch).
   branches: { id: string; name: string }[];
 }
+
+// Phase 19: Manual delivery routes
+export type DeliveryRouteStatus = 'PLANNED' | 'PREPARING' | 'IN_ROUTE' | 'PARTIALLY_COMPLETED' | 'COMPLETED' | 'CANCELLED';
+export type DeliveryRouteStopStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'SKIPPED';
+
+export interface DeliveryRouteStop {
+  id: string;
+  routeId: string;
+  fulfillmentId: string;
+  sequence: number;
+  status: DeliveryRouteStopStatus;
+  plannedAt: string | null;
+  completedAt: string | null;
+  notes: string | null;
+  fulfillment: Fulfillment & {
+    order: {
+      id: string;
+      orderNumber: string;
+      contact: { id: string; name: string };
+      address: CustomerAddress | null;
+    } | null;
+  };
+}
+
+export interface DeliveryRoute {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  routeDate: string;
+  responsibleUserId: string | null;
+  responsibleUser: { id: string; email: string } | null;
+  status: DeliveryRouteStatus;
+  startedAt: string | null;
+  completedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  stops: DeliveryRouteStop[];
+  // Solo la asignación vigente (unassignedAt: null) — el historial completo
+  // no se usa en el panel de ruta.
+  assignments: DeliveryAssignment[];
+  _count?: { stops: number };
+}
+
+// Fase 20: flota propia, zonas/tarifas, método de entrega por tenant/sucursal.
+export type DriverStatus = 'ACTIVE' | 'INACTIVE';
+export type VehicleType = 'MOTORCYCLE' | 'CAR' | 'BICYCLE' | 'VAN' | 'OTHER';
+export type DeliveryZoneMatchType = 'ZONE_LABEL' | 'RADIUS_KM';
+export type DeliveryProviderType = 'OWN_FLEET' | 'TELEGRAM_NOTIFY';
+export type DeliveryOperationMode = 'ROUTE_BASED' | 'IMMEDIATE';
+
+export interface Driver {
+  id: string;
+  branchId: string | null;
+  name: string;
+  phone: string;
+  status: DriverStatus;
+  notes: string | null;
+}
+
+export interface Vehicle {
+  id: string;
+  branchId: string | null;
+  type: VehicleType;
+  label: string | null;
+  plate: string | null;
+  notes: string | null;
+}
+
+export interface DeliveryAssignment {
+  id: string;
+  routeId: string;
+  driverId: string;
+  driver: Driver;
+  vehicleId: string | null;
+  vehicle: Vehicle | null;
+  assignedByUserId: string;
+  assignedAt: string;
+  unassignedAt: string | null;
+}
+
+export interface DeliveryZone {
+  id: string;
+  branchId: string;
+  name: string;
+  matchType: DeliveryZoneMatchType;
+  zoneLabels: string[];
+  radiusKm: number | null;
+  baseFee: number;
+  freeOverAmount: number | null;
+  sortOrder: number;
+  enabled: boolean;
+}
+
+export interface DeliveryProviderConfig {
+  id: string;
+  branchId: string | null;
+  type: DeliveryProviderType;
+  operationMode: DeliveryOperationMode;
+  config: { chatId?: string } | null;
+  hasBotToken: boolean;
+  enabled: boolean;
+}
+
+// A LOCAL_DELIVERY fulfillment not yet assigned to any route — the shape
+// GET /delivery/routes/available-fulfillments returns for the stop picker.
+export interface AvailableFulfillment {
+  id: string;
+  branchId: string | null;
+  order: { id: string; orderNumber: string; contact: { id: string; name: string } } | null;
+  address: CustomerAddress | null;
+}

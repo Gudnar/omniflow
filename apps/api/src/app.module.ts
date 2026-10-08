@@ -21,6 +21,9 @@ import { EcommerceModule } from './modules/ecommerce/ecommerce.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CommerceModule } from './modules/commerce/commerce.module';
 import { BookingModule } from './modules/booking/booking.module';
+import { DeliveryModule } from './modules/delivery/delivery.module';
+import { DeliveryZonesModule } from './modules/delivery/delivery-zones.module';
+import { DeliveryProviderConfigModule } from './modules/delivery/delivery-provider-config.module';
 import { EventsModule } from './modules/events/events.module';
 import { InternalActionsModule } from './modules/internal-actions/internal-actions.module';
 import { WorkflowsModule } from './modules/workflows/workflows.module';
@@ -75,6 +78,9 @@ import { JwtAuthGuard, PermissionsGuard } from './modules/auth/guards';
     CatalogModule,
     CommerceModule,
     BookingModule,
+    DeliveryModule,
+    DeliveryZonesModule,
+    DeliveryProviderConfigModule,
     EventsModule,
     InternalActionsModule,
     WorkflowsModule,

@@ -23,6 +23,8 @@ describe('OrdersService', () => {
   let tx: any;
   let eventsService: any;
   let messagesService: any;
+  let queueService: any;
+  let deliveryProviderConfigService: any;
 
   beforeEach(() => {
     tx = {
@@ -44,7 +46,9 @@ describe('OrdersService', () => {
     };
     eventsService = { emit: jest.fn() };
     messagesService = { create: jest.fn() };
-    service = new OrdersService(prisma, eventsService, messagesService);
+    queueService = { enqueueDeliveryNotifyForOrder: jest.fn() };
+    deliveryProviderConfigService = { resolveForBranch: jest.fn().mockResolvedValue(null) };
+    service = new OrdersService(prisma, eventsService, messagesService, queueService, deliveryProviderConfigService);
   });
 
   describe('findOne', () => {
@@ -261,6 +265,40 @@ describe('OrdersService', () => {
         { orderId: 'o1', orderNumber: 'ORD-TEST', fromStatus: 'PENDING', toStatus: 'CONFIRMED', productIds: [undefined], productNames: [undefined] },
         'c1',
       );
+    });
+
+    it('enqueues a Telegram notify when the branch is LOCAL_DELIVERY + TELEGRAM_NOTIFY + IMMEDIATE', async () => {
+      prisma.client.order.findUnique.mockResolvedValue(
+        order({ status: 'PENDING', tenantId: 't1', branchId: 'b1', fulfillmentType: 'LOCAL_DELIVERY' }),
+      );
+      deliveryProviderConfigService.resolveForBranch.mockResolvedValue({ type: 'TELEGRAM_NOTIFY', operationMode: 'IMMEDIATE' });
+
+      await service.confirm('o1', 'u1');
+
+      expect(queueService.enqueueDeliveryNotifyForOrder).toHaveBeenCalledWith('t1', 'o1');
+    });
+
+    it('does not enqueue anything for a ROUTE_BASED branch', async () => {
+      prisma.client.order.findUnique.mockResolvedValue(
+        order({ status: 'PENDING', tenantId: 't1', branchId: 'b1', fulfillmentType: 'LOCAL_DELIVERY' }),
+      );
+      deliveryProviderConfigService.resolveForBranch.mockResolvedValue({ type: 'TELEGRAM_NOTIFY', operationMode: 'ROUTE_BASED' });
+
+      await service.confirm('o1', 'u1');
+
+      expect(queueService.enqueueDeliveryNotifyForOrder).not.toHaveBeenCalled();
+    });
+
+    it('does not enqueue anything for a PICKUP order', async () => {
+      prisma.client.order.findUnique.mockResolvedValue(
+        order({ status: 'PENDING', tenantId: 't1', branchId: 'b1', fulfillmentType: 'PICKUP' }),
+      );
+      deliveryProviderConfigService.resolveForBranch.mockResolvedValue({ type: 'TELEGRAM_NOTIFY', operationMode: 'IMMEDIATE' });
+
+      await service.confirm('o1', 'u1');
+
+      expect(deliveryProviderConfigService.resolveForBranch).not.toHaveBeenCalled();
+      expect(queueService.enqueueDeliveryNotifyForOrder).not.toHaveBeenCalled();
     });
   });
 
