@@ -1032,7 +1032,7 @@ export interface DeliveryRoute {
 // Fase 20: flota propia, zonas/tarifas, método de entrega por tenant/sucursal.
 export type DriverStatus = 'ACTIVE' | 'INACTIVE';
 export type VehicleType = 'MOTORCYCLE' | 'CAR' | 'BICYCLE' | 'VAN' | 'OTHER';
-export type DeliveryZoneMatchType = 'ZONE_LABEL' | 'RADIUS_KM';
+export type DeliveryZoneMatchType = 'ZONE_LABEL' | 'RADIUS_KM' | 'DISTANCE_TIERS';
 export type DeliveryProviderType = 'OWN_FLEET' | 'TELEGRAM_NOTIFY';
 export type DeliveryOperationMode = 'ROUTE_BASED' | 'IMMEDIATE';
 
@@ -1066,6 +1066,20 @@ export interface DeliveryAssignment {
   unassignedAt: string | null;
 }
 
+export interface DeliveryRateTier {
+  id: string;
+  uptoKm: number;
+  fee: number;
+}
+
+export interface DeliveryRateProfile {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  active: boolean;
+  tiers: DeliveryRateTier[];
+}
+
 export interface DeliveryZone {
   id: string;
   branchId: string;
@@ -1073,10 +1087,12 @@ export interface DeliveryZone {
   matchType: DeliveryZoneMatchType;
   zoneLabels: string[];
   radiusKm: number | null;
-  baseFee: number;
+  baseFee: number | null;
   freeOverAmount: number | null;
   sortOrder: number;
   enabled: boolean;
+  // Solo tiene filas cuando matchType = DISTANCE_TIERS.
+  rateProfiles: DeliveryRateProfile[];
 }
 
 export interface DeliveryProviderConfig {

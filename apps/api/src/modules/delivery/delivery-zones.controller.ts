@@ -2,7 +2,12 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Request, UseG
 import { JwtAuthGuard } from '../auth/guards';
 import { RequirePermission } from '../auth/decorators';
 import { DeliveryZonesService } from './delivery-zones.service';
-import { CreateDeliveryZoneDto, UpdateDeliveryZoneDto } from './delivery-zone.dto';
+import {
+  CreateDeliveryZoneDto,
+  UpdateDeliveryZoneDto,
+  CreateRateProfileDto,
+  UpdateRateProfileDto,
+} from './delivery-zone.dto';
 
 @Controller('delivery/zones')
 export class DeliveryZonesController {
@@ -35,5 +40,43 @@ export class DeliveryZonesController {
   @RequirePermission('delivery.manage')
   delete(@Param('id') id: string) {
     return this.deliveryZonesService.delete(id);
+  }
+
+  // ---- Tarifas especiales (solo zonas DISTANCE_TIERS) ---------------------
+
+  @Get(':zoneId/rate-profiles')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('delivery.read')
+  @HttpCode(200)
+  listRateProfiles(@Param('zoneId') zoneId: string) {
+    return this.deliveryZonesService.listRateProfiles(zoneId);
+  }
+
+  @Post(':zoneId/rate-profiles')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('delivery.manage')
+  createRateProfile(@Param('zoneId') zoneId: string, @Body() dto: CreateRateProfileDto) {
+    return this.deliveryZonesService.createRateProfile(zoneId, dto);
+  }
+
+  @Patch(':zoneId/rate-profiles/:id')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('delivery.manage')
+  updateRateProfile(@Param('id') id: string, @Body() dto: UpdateRateProfileDto) {
+    return this.deliveryZonesService.updateRateProfile(id, dto);
+  }
+
+  @Post(':zoneId/rate-profiles/:id/activate')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('delivery.manage')
+  activateRateProfile(@Param('zoneId') zoneId: string, @Param('id') id: string) {
+    return this.deliveryZonesService.activateRateProfile(zoneId, id);
+  }
+
+  @Delete(':zoneId/rate-profiles/:id')
+  @UseGuards(JwtAuthGuard)
+  @RequirePermission('delivery.manage')
+  deleteRateProfile(@Param('id') id: string) {
+    return this.deliveryZonesService.deleteRateProfile(id);
   }
 }

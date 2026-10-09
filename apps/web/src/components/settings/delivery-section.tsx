@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Bike } from 'lucide-react';
+import { Plus, Trash2, Bike, CloudRain } from 'lucide-react';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/lib/toast-context';
 import { apiGet, apiPost, apiPatch, apiDelete } from '@/lib/api-client';
@@ -12,6 +12,7 @@ import type {
   VehicleType,
   DeliveryZone,
   DeliveryZoneMatchType,
+  DeliveryRateProfile,
   DeliveryProviderConfig,
   DeliveryProviderType,
   DeliveryOperationMode,
@@ -225,7 +226,60 @@ function emptyZoneForm() {
     radiusKm: '',
     baseFee: '',
     freeOverAmount: '',
+    tiers: [{ uptoKm: '', fee: '' }] as { uptoKm: string; fee: string }[],
   };
+}
+
+function TiersEditor({
+  tiers,
+  onChange,
+}: {
+  tiers: { uptoKm: string; fee: string }[];
+  onChange: (tiers: { uptoKm: string; fee: string }[]) => void;
+}) {
+  const update = (index: number, field: 'uptoKm' | 'fee', value: string) => {
+    onChange(tiers.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
+  };
+  const remove = (index: number) => onChange(tiers.filter((_, i) => i !== index));
+
+  return (
+    <div className="space-y-2">
+      {tiers.map((tier, index) => (
+        <div key={index} className="flex items-center gap-2">
+          <input
+            type="number"
+            value={tier.uptoKm}
+            onChange={(e) => update(index, 'uptoKm', e.target.value)}
+            placeholder="hasta km"
+            className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          />
+          <span className="text-xs text-gray-400">km →</span>
+          <input
+            type="number"
+            value={tier.fee}
+            onChange={(e) => update(index, 'fee', e.target.value)}
+            placeholder="tarifa"
+            className="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => remove(index)}
+            disabled={tiers.length === 1}
+            className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 disabled:opacity-30 shrink-0"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      ))}
+      <button
+        type="button"
+        onClick={() => onChange([...tiers, { uptoKm: '', fee: '' }])}
+        className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
+      >
+        <Plus className="w-3.5 h-3.5" /> Agregar tramo
+      </button>
+    </div>
+  );
 }
 
 function DeliveryZonesCard({ branchId }: { branchId: string }) {
@@ -259,26 +313,49 @@ function DeliveryZonesCard({ branchId }: { branchId: string }) {
       matchType: zone.matchType,
       zoneLabels: zone.zoneLabels.join(', '),
       radiusKm: zone.radiusKm?.toString() ?? '',
-      baseFee: zone.baseFee.toString(),
+      baseFee: zone.baseFee?.toString() ?? '',
       freeOverAmount: zone.freeOverAmount?.toString() ?? '',
+      tiers: [{ uptoKm: '', fee: '' }],
     });
     setShowModal(true);
   };
 
   const save = async () => {
-    if (!form.name.trim() || !form.baseFee) {
-      toast.error('Nombre y tarifa son obligatorios');
+    if (!form.name.trim()) {
+      toast.error('El nombre es obligatorio');
       return;
     }
-    const payload = {
+    if (form.matchType !== 'DISTANCE_TIERS' && !form.baseFee) {
+      toast.error('La tarifa es obligatoria');
+      return;
+    }
+    if (form.matchType === 'DISTANCE_TIERS' && !form.id) {
+      const validTiers = form.tiers.filter((t) => t.uptoKm && t.fee);
+      if (validTiers.length === 0) {
+        toast.error('Agregá al menos un tramo con distancia y tarifa');
+        return;
+      }
+    }
+    const payload: any = {
       branchId,
       name: form.name,
       matchType: form.matchType,
-      zoneLabels: form.matchType === 'ZONE_LABEL' ? form.zoneLabels.split(',').map((s) => s.trim()).filter(Boolean) : undefined,
-      radiusKm: form.matchType === 'RADIUS_KM' ? Number(form.radiusKm) : undefined,
-      baseFee: Number(form.baseFee),
       freeOverAmount: form.freeOverAmount ? Number(form.freeOverAmount) : undefined,
     };
+    if (form.matchType === 'ZONE_LABEL') {
+      payload.zoneLabels = form.zoneLabels.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+    if (form.matchType !== 'DISTANCE_TIERS') {
+      payload.baseFee = Number(form.baseFee);
+    }
+    if (form.matchType === 'RADIUS_KM') {
+      payload.radiusKm = Number(form.radiusKm);
+    }
+    if (form.matchType === 'DISTANCE_TIERS' && !form.id) {
+      payload.tiers = form.tiers
+        .filter((t) => t.uptoKm && t.fee)
+        .map((t) => ({ uptoKm: Number(t.uptoKm), fee: Number(t.fee) }));
+    }
     setSaving(true);
     try {
       if (form.id) {
@@ -333,17 +410,29 @@ function DeliveryZonesCard({ branchId }: { branchId: string }) {
       ) : (
         <div className="space-y-2">
           {zones.map((zone) => (
-            <div key={zone.id} className="flex items-center justify-between border border-gray-200 rounded-lg p-3">
-              <button onClick={() => openEdit(zone)} className="text-left min-w-0">
-                <p className="text-sm font-semibold text-gray-900">{zone.name}</p>
-                <p className="text-xs text-gray-500">
-                  {zone.matchType === 'ZONE_LABEL' ? zone.zoneLabels.join(', ') : `Radio ${zone.radiusKm} km`} —{' '}
-                  {zone.baseFee} {zone.freeOverAmount ? `(gratis desde ${zone.freeOverAmount})` : ''}
-                </p>
-              </button>
-              <button onClick={() => remove(zone)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 shrink-0">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+            <div key={zone.id} className="border border-gray-200 rounded-lg p-3">
+              <div className="flex items-center justify-between gap-2">
+                <button onClick={() => openEdit(zone)} className="text-left min-w-0">
+                  <p className="text-sm font-semibold text-gray-900">{zone.name}</p>
+                  {zone.matchType === 'DISTANCE_TIERS' ? (
+                    <p className="text-xs text-gray-500">
+                      Por tramos de distancia — perfil activo:{' '}
+                      {zone.rateProfiles.find((p) => p.active)?.name ?? 'Normal'}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500">
+                      {zone.matchType === 'ZONE_LABEL' ? zone.zoneLabels.join(', ') : `Radio ${zone.radiusKm} km`} —{' '}
+                      {zone.baseFee} {zone.freeOverAmount ? `(gratis desde ${zone.freeOverAmount})` : ''}
+                    </p>
+                  )}
+                </button>
+                <button onClick={() => remove(zone)} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 shrink-0">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              {zone.matchType === 'DISTANCE_TIERS' && (
+                <RateProfilesManager zoneId={zone.id} onChanged={refetch} />
+              )}
             </div>
           ))}
         </div>
@@ -361,64 +450,99 @@ function DeliveryZonesCard({ branchId }: { branchId: string }) {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-1.5">Cómo identificarla</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="radio"
-                  checked={form.matchType === 'ZONE_LABEL'}
-                  onChange={() => setForm({ ...form, matchType: 'ZONE_LABEL' })}
-                />
-                Por nombre de barrio/zona
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="radio"
-                  checked={form.matchType === 'RADIUS_KM'}
-                  onChange={() => setForm({ ...form, matchType: 'RADIUS_KM' })}
-                />
-                Por radio (km)
-              </label>
-            </div>
-          </div>
-
-          {form.matchType === 'ZONE_LABEL' ? (
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1.5">Nombres de zona (separados por coma)</label>
-              <input
-                value={form.zoneLabels}
-                onChange={(e) => setForm({ ...form, zoneLabels: e.target.value })}
-                placeholder="centro, zona norte"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-            </div>
+          {form.id && form.matchType === 'DISTANCE_TIERS' ? (
+            <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+              Esta zona cobra por tramos de distancia — gestioná los tramos y las tarifas especiales (como lluvia)
+              desde la lista de zonas, debajo de esta.
+            </p>
           ) : (
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1.5">Radio en km desde la sucursal</label>
-              <input
-                type="number"
-                value={form.radiusKm}
-                onChange={(e) => setForm({ ...form, radiusKm: e.target.value })}
-                placeholder="5"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-              <p className="text-xs text-amber-700 mt-1">
-                Necesita que esta sucursal tenga latitud/longitud configuradas.
-              </p>
-            </div>
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1.5">Cómo identificarla</label>
+                <div className="flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      disabled={!!form.id}
+                      checked={form.matchType === 'ZONE_LABEL'}
+                      onChange={() => setForm({ ...form, matchType: 'ZONE_LABEL' })}
+                    />
+                    Por nombre de barrio/zona
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      disabled={!!form.id}
+                      checked={form.matchType === 'RADIUS_KM'}
+                      onChange={() => setForm({ ...form, matchType: 'RADIUS_KM' })}
+                    />
+                    Por radio (km), tarifa plana
+                  </label>
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="radio"
+                      disabled={!!form.id}
+                      checked={form.matchType === 'DISTANCE_TIERS'}
+                      onChange={() => setForm({ ...form, matchType: 'DISTANCE_TIERS' })}
+                    />
+                    Por tramos de distancia (precio distinto cada km)
+                  </label>
+                </div>
+              </div>
+
+              {form.matchType === 'ZONE_LABEL' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-1.5">Nombres de zona (separados por coma)</label>
+                  <input
+                    value={form.zoneLabels}
+                    onChange={(e) => setForm({ ...form, zoneLabels: e.target.value })}
+                    placeholder="centro, zona norte"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                </div>
+              )}
+
+              {form.matchType === 'RADIUS_KM' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-1.5">Radio en km desde la sucursal</label>
+                  <input
+                    type="number"
+                    value={form.radiusKm}
+                    onChange={(e) => setForm({ ...form, radiusKm: e.target.value })}
+                    placeholder="5"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                  />
+                  <p className="text-xs text-amber-700 mt-1">
+                    Necesita que esta sucursal tenga latitud/longitud configuradas.
+                  </p>
+                </div>
+              )}
+
+              {form.matchType === 'DISTANCE_TIERS' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-900 mb-1.5">Tramos (tarifa "Normal")</label>
+                  <TiersEditor tiers={form.tiers} onChange={(tiers) => setForm({ ...form, tiers })} />
+                  <p className="text-xs text-amber-700 mt-2">
+                    Necesita que esta sucursal tenga latitud/longitud configuradas. Más tarifas especiales (ej.
+                    lluvia) se agregan después de crear la zona.
+                  </p>
+                </div>
+              )}
+            </>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-900 mb-1.5">Tarifa</label>
-              <input
-                type="number"
-                value={form.baseFee}
-                onChange={(e) => setForm({ ...form, baseFee: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-              />
-            </div>
+          <div className={form.matchType === 'DISTANCE_TIERS' ? '' : 'grid grid-cols-2 gap-3'}>
+            {form.matchType !== 'DISTANCE_TIERS' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-1.5">Tarifa</label>
+                <input
+                  type="number"
+                  value={form.baseFee}
+                  onChange={(e) => setForm({ ...form, baseFee: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-1.5">Envío gratis desde (opcional)</label>
               <input
@@ -436,6 +560,137 @@ function DeliveryZonesCard({ branchId }: { branchId: string }) {
             Cancelar
           </button>
           <button onClick={save} disabled={saving} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm">
+            Guardar
+          </button>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+function emptyProfileForm() {
+  return { name: '', tiers: [{ uptoKm: '', fee: '' }] as { uptoKm: string; fee: string }[] };
+}
+
+function RateProfilesManager({ zoneId, onChanged }: { zoneId: string; onChanged: () => void }) {
+  const { tokens } = useAuth();
+  const toast = useToast();
+  const [profiles, setProfiles] = useState<DeliveryRateProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(emptyProfileForm());
+
+  const refetch = () =>
+    apiGet<DeliveryRateProfile[]>(`/delivery/zones/${zoneId}/rate-profiles`, tokens?.accessToken).then(setProfiles);
+
+  useEffect(() => {
+    if (!tokens) return;
+    refetch()
+      .catch((err) => console.error('Error fetching rate profiles:', err))
+      .finally(() => setLoading(false));
+  }, [tokens, zoneId]);
+
+  const activate = async (profileId: string) => {
+    try {
+      await apiPost(`/delivery/zones/${zoneId}/rate-profiles/${profileId}/activate`, tokens?.accessToken, {});
+      await refetch();
+      onChanged();
+      toast.success('Tarifa activada correctamente');
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo activar la tarifa');
+    }
+  };
+
+  const remove = async (profile: DeliveryRateProfile) => {
+    if (!confirm(`¿Eliminar la tarifa "${profile.name}"?`)) return;
+    try {
+      await apiDelete(`/delivery/zones/${zoneId}/rate-profiles/${profile.id}`, tokens?.accessToken);
+      await refetch();
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo eliminar la tarifa');
+    }
+  };
+
+  const create = async () => {
+    const validTiers = form.tiers.filter((t) => t.uptoKm && t.fee);
+    if (!form.name.trim() || validTiers.length === 0) {
+      toast.error('Nombre y al menos un tramo son obligatorios');
+      return;
+    }
+    setSaving(true);
+    try {
+      await apiPost(`/delivery/zones/${zoneId}/rate-profiles`, tokens?.accessToken, {
+        name: form.name,
+        tiers: validTiers.map((t) => ({ uptoKm: Number(t.uptoKm), fee: Number(t.fee) })),
+      });
+      await refetch();
+      setShowModal(false);
+      setForm(emptyProfileForm());
+      toast.success('Tarifa especial creada correctamente');
+    } catch (err: any) {
+      toast.error(err.message ?? 'No se pudo crear la tarifa');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) return null;
+
+  return (
+    <div className="mt-3 pl-3 border-l-2 border-gray-100 space-y-1.5">
+      {profiles.map((profile) => (
+        <div key={profile.id} className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <CloudRain className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <span className="text-xs text-gray-700 truncate">
+              <span className={profile.active ? 'font-semibold text-gray-900' : ''}>{profile.name}</span>
+              {' — '}
+              {profile.tiers.map((t) => `${t.uptoKm}km: ${t.fee}`).join(', ')}
+            </span>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {!profile.active && (
+              <button onClick={() => activate(profile.id)} className="text-xs font-semibold text-blue-600 hover:text-blue-700">
+                Activar
+              </button>
+            )}
+            {!profile.isDefault && !profile.active && (
+              <button onClick={() => remove(profile)} className="p-1 rounded hover:bg-red-50 text-gray-400 hover:text-red-500">
+                <Trash2 className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+      <button
+        onClick={() => setShowModal(true)}
+        className="flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
+      >
+        <Plus className="w-3.5 h-3.5" /> Agregar tarifa especial (ej. lluvia)
+      </button>
+
+      <Modal open={showModal} onClose={() => setShowModal(false)} title="Nueva tarifa especial" size="md">
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1.5">Nombre</label>
+            <input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Ej: Lluvia"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-1.5">Tramos</label>
+            <TiersEditor tiers={form.tiers} onChange={(tiers) => setForm({ ...form, tiers })} />
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-900 hover:bg-gray-50 font-medium text-sm">
+            Cancelar
+          </button>
+          <button onClick={create} disabled={saving} className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-lg font-semibold text-sm">
             Guardar
           </button>
         </div>

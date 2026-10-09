@@ -2552,6 +2552,11 @@ model DeliveryAssignment {
 enum DeliveryZoneMatchType {
   ZONE_LABEL
   RADIUS_KM
+  // Cobro por tramos de distancia (ej. 1km=5bs, 2km=7bs, 3km=10bs...),
+  // contra Branch.latitude/longitude igual que RADIUS_KM, pero la tarifa
+  // sale de los DeliveryRateTier del DeliveryRateProfile activo de esta
+  // zona, no de baseFee.
+  DISTANCE_TIERS
 }
 
 // Simplificado a un solo modelo (la documentación nombra zonas y tarifas
@@ -2572,9 +2577,14 @@ model DeliveryZone {
   matchType  DeliveryZoneMatchType
   // Usado si matchType = ZONE_LABEL, contra CustomerAddress.zone.
   zoneLabels String[]
-  // Usado si matchType = RADIUS_KM, contra Branch.latitude/longitude.
+  // Usado si matchType = RADIUS_KM o DISTANCE_TIERS, contra
+  // Branch.latitude/longitude. En DISTANCE_TIERS actúa como el radio
+  // máximo de cobertura (debería coincidir con el último tramo configurado).
   radiusKm   Float?
 
+  // Ignorados cuando matchType = DISTANCE_TIERS — la tarifa sale de los
+  // DeliveryRateTier del DeliveryRateProfile activo (ver abajo). Siguen
+  // usándose para ZONE_LABEL/RADIUS_KM.
   baseFee        Decimal  @db.Decimal(10, 2)
   freeOverAmount Decimal? @db.Decimal(10, 2)
 
@@ -2585,7 +2595,51 @@ model DeliveryZone {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Solo tiene filas cuando matchType = DISTANCE_TIERS.
+  rateProfiles DeliveryRateProfile[]
+
   @@index([tenantId, branchId, sortOrder])
+}
+
+// Tarifas especiales con nombre (ej. "Normal", "Lluvia", "Feriado") para una
+// zona DISTANCE_TIERS — exactamente una está activa por zona a la vez; se
+// activa/desactiva a mano (no hay integración con clima ni nada automático).
+// "Normal" se crea sola al crear la zona y no se puede borrar.
+model DeliveryRateProfile {
+  id String @id @default(cuid())
+
+  zoneId String
+  zone   DeliveryZone @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+
+  name String
+
+  // No se puede borrar — siempre tiene que haber algo activo.
+  isDefault Boolean @default(false)
+  // Exactamente un perfil activo por zona; lo hace cumplir el service, no
+  // una constraint de base (igual que DeliveryAssignment.unassignedAt).
+  active    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tiers DeliveryRateTier[]
+
+  @@index([zoneId])
+}
+
+// Un tramo: hasta uptoKm, se cobra fee. "1km=5bs, 2km=7bs, 3km=10bs" son 3
+// filas (uptoKm: 1/2/3, fee: 5/7/10) — la primera cuyo uptoKm sea >= la
+// distancia real, ordenadas ascendente, es la que se cobra.
+model DeliveryRateTier {
+  id String @id @default(cuid())
+
+  rateProfileId String
+  rateProfile   DeliveryRateProfile @relation(fields: [rateProfileId], references: [id], onDelete: Cascade)
+
+  uptoKm Float
+  fee    Decimal @db.Decimal(10, 2)
+
+  @@index([rateProfileId, uptoKm])
 }
 
 enum PaymentMethodType {
